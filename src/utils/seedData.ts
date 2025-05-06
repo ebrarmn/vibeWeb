@@ -10,18 +10,21 @@ const seedData = async () => {
                 displayName: 'Admin User',
                 role: 'admin' as const,
                 clubIds: [],
+                clubRoles: {}
             },
             {
                 email: 'user1@vibecom.com',
                 displayName: 'Ahmet Yılmaz',
                 role: 'user' as const,
                 clubIds: [],
+                clubRoles: {}
             },
             {
                 email: 'user2@vibecom.com',
                 displayName: 'Ayşe Demir',
                 role: 'user' as const,
                 clubIds: [],
+                clubRoles: {}
             }
         ];
 
@@ -35,22 +38,33 @@ const seedData = async () => {
             {
                 name: 'Müzik Kulübü',
                 description: 'Üniversitemizin müzik tutkunlarını bir araya getiren kulüp.',
-                adminIds: [userIds[0]],
-                memberIds: [userIds[1], userIds[2]],
+                memberIds: [userIds[0], userIds[1], userIds[2]],
+                memberRoles: {
+                    [userIds[0]]: 'admin',
+                    [userIds[1]]: 'member',
+                    [userIds[2]]: 'member'
+                },
                 eventIds: []
             },
             {
                 name: 'Dans Kulübü',
                 description: 'Modern dans, halk dansları ve latin dansları çalışmaları yapan kulüp.',
-                adminIds: [userIds[1]],
-                memberIds: [userIds[2]],
+                memberIds: [userIds[1], userIds[2]],
+                memberRoles: {
+                    [userIds[1]]: 'admin',
+                    [userIds[2]]: 'member'
+                },
                 eventIds: []
             },
             {
                 name: 'Tiyatro Kulübü',
                 description: 'Sahne sanatları ve tiyatro etkinlikleri düzenleyen kulüp.',
-                adminIds: [userIds[2]],
-                memberIds: [userIds[0], userIds[1]],
+                memberIds: [userIds[0], userIds[1], userIds[2]],
+                memberRoles: {
+                    [userIds[2]]: 'admin',
+                    [userIds[0]]: 'member',
+                    [userIds[1]]: 'member'
+                },
                 eventIds: []
             }
         ];
@@ -60,10 +74,30 @@ const seedData = async () => {
             clubs.map(club => clubServices.create(club))
         );
 
-        // Kullanıcıların clubIds'lerini güncelle
-        await userServices.update(userIds[0], { clubIds: [clubIds[0]] });
-        await userServices.update(userIds[1], { clubIds: [clubIds[1]] });
-        await userServices.update(userIds[2], { clubIds: [clubIds[2]] });
+        // Kullanıcıların clubIds ve clubRoles'lerini güncelle
+        await userServices.update(userIds[0], { 
+            clubIds: [clubIds[0], clubIds[2]],
+            clubRoles: {
+                [clubIds[0]]: 'admin',
+                [clubIds[2]]: 'member'
+            }
+        });
+        await userServices.update(userIds[1], { 
+            clubIds: [clubIds[0], clubIds[1], clubIds[2]],
+            clubRoles: {
+                [clubIds[0]]: 'member',
+                [clubIds[1]]: 'admin',
+                [clubIds[2]]: 'member'
+            }
+        });
+        await userServices.update(userIds[2], { 
+            clubIds: [clubIds[0], clubIds[1], clubIds[2]],
+            clubRoles: {
+                [clubIds[0]]: 'member',
+                [clubIds[1]]: 'member',
+                [clubIds[2]]: 'admin'
+            }
+        });
 
         // Etkinlikler için test verileri
         const events: Omit<Event, 'id' | 'createdAt' | 'updatedAt'>[] = [
@@ -75,7 +109,11 @@ const seedData = async () => {
                 endDate: new Date('2024-05-15T22:00:00').toISOString(),
                 location: 'Üniversite Konferans Salonu',
                 capacity: 200,
-                attendeeIds: [userIds[1], userIds[2]]
+                attendeeIds: [userIds[1], userIds[2]],
+                attendeeStatus: {
+                    [userIds[1]]: 'registered',
+                    [userIds[2]]: 'attended'
+                }
             },
             {
                 title: 'Dans Gecesi',
@@ -85,7 +123,10 @@ const seedData = async () => {
                 endDate: new Date('2024-05-20T23:00:00').toISOString(),
                 location: 'Dans Stüdyosu',
                 capacity: 50,
-                attendeeIds: [userIds[0]]
+                attendeeIds: [userIds[0]],
+                attendeeStatus: {
+                    [userIds[0]]: 'registered'
+                }
             },
             {
                 title: 'Tiyatro Gösterisi',
@@ -95,7 +136,12 @@ const seedData = async () => {
                 endDate: new Date('2024-06-01T21:30:00').toISOString(),
                 location: 'Şehir Tiyatrosu',
                 capacity: 150,
-                attendeeIds: [userIds[0], userIds[1], userIds[2]]
+                attendeeIds: [userIds[0], userIds[1], userIds[2]],
+                attendeeStatus: {
+                    [userIds[0]]: 'registered',
+                    [userIds[1]]: 'attended',
+                    [userIds[2]]: 'cancelled'
+                }
             }
         ];
 

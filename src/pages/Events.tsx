@@ -24,7 +24,7 @@ import {
     Group as GroupIcon,
     CalendarMonth as CalendarIcon
 } from '@mui/icons-material';
-import { eventServices } from '../services/firestore';
+import { eventServices, userServices } from '../services/firestore';
 import { Event } from '../types/models';
 import SearchBar from '../components/SearchBar';
 import { format, isAfter, isBefore, isSameDay, parseISO } from 'date-fns';
@@ -39,6 +39,7 @@ export default function Events() {
     const [searchTerm, setSearchTerm] = useState('');
     const [capacityFilter, setCapacityFilter] = useState('all');
     const [dateFilter, setDateFilter] = useState('all');
+    const [userMap, setUserMap] = useState<{ [id: string]: { displayName: string; email: string } }>({});
 
     const [formData, setFormData] = useState({
         title: '',
@@ -62,6 +63,11 @@ export default function Events() {
 
     useEffect(() => {
         fetchEvents();
+        userServices.getAll().then(users => {
+            const map: { [id: string]: { displayName: string; email: string } } = {};
+            users.forEach(u => { map[u.id] = { displayName: u.displayName, email: u.email }; });
+            setUserMap(map);
+        });
     }, []);
 
     const formatEventDate = (date: Date | string | null): string => {
@@ -159,7 +165,8 @@ export default function Events() {
                 await eventServices.create({
                     ...eventData,
                     clubId: '',
-                    attendeeIds: []
+                    attendeeIds: [],
+                    attendeeStatus: {}
                 });
             }
             fetchEvents();
@@ -279,6 +286,30 @@ export default function Events() {
                                     color="primary"
                                     variant="outlined"
                                 />
+                            </Box>
+                            <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Katılımcılar:</Typography>
+                                {!Array.isArray(event.attendeeIds) || event.attendeeIds.length === 0 ? (
+                                    <Typography variant="body2" color="text.secondary">Katılımcı yok</Typography>
+                                ) : (
+                                    event.attendeeIds
+                                        .filter(uid => !!uid && userMap[uid])
+                                        .map(uid => (
+                                            <Box key={uid} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                                <Typography variant="body2">
+                                                    {userMap[uid].displayName}
+                                                    {userMap[uid].email ? ` (${userMap[uid].email})` : ''}
+                                                    {event.attendeeStatus && event.attendeeStatus[uid]
+                                                        ? ` - ${event.attendeeStatus[uid] === 'registered'
+                                                            ? 'Kayıtlı'
+                                                            : event.attendeeStatus[uid] === 'attended'
+                                                            ? 'Katıldı'
+                                                            : 'İptal'}`
+                                                        : ''}
+                                                </Typography>
+                                            </Box>
+                                        ))
+                                )}
                             </Box>
                             <Box sx={{ mt: 2, display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                                 <Button

@@ -28,6 +28,7 @@ const menuItems = [
     { text: 'Kulüpler', icon: <BusinessIcon />, path: '/clubs' },
     { text: 'Kullanıcılar', icon: <GroupIcon />, path: '/users' },
     { text: 'Etkinlikler', icon: <EventIcon />, path: '/events' },
+    { text: 'Kulüp Başvuruları', icon: <BusinessIcon />, path: '/club-requests' },
 ];
 
 export default function Layout() {
@@ -68,6 +69,7 @@ export default function Layout() {
                 sx={{
                     width: { sm: `calc(100% - ${drawerWidth}px)` },
                     ml: { sm: `${drawerWidth}px` },
+                    background: 'linear-gradient(45deg, #012130 40%, #4f0aff 90%)'
                 }}
             >
                 <Toolbar>
@@ -80,8 +82,18 @@ export default function Layout() {
                     >
                         <MenuIcon />
                     </IconButton>
-                    <Typography variant="h6" noWrap component="div">
-                        VibeCOM Admin Panel
+                    <Typography 
+                        variant="h5" 
+                        noWrap 
+                        component="div"
+                        sx={{
+                            fontWeight: 'bold',
+                            letterSpacing: '0.07em',
+                            textShadow: '4px 4px 8px rgba(0,0,0,0.2)',
+                            fontFamily: '"Segoe UI", "Roboto", "Helvetica", "Arial", sans-serif'
+                        }}
+                    >
+                        VIBE-Virtual Interactive Belonging Engagement
                     </Typography>
                 </Toolbar>
             </AppBar>

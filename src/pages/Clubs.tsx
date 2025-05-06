@@ -22,7 +22,7 @@ import {
     Business as BusinessIcon,
     Group as GroupIcon
 } from '@mui/icons-material';
-import { clubServices } from '../services/firestore';
+import { clubServices, userServices } from '../services/firestore';
 import { Club } from '../types/models';
 import SearchBar from '../components/SearchBar';
 
@@ -38,6 +38,7 @@ export default function Clubs() {
     });
     const [searchTerm, setSearchTerm] = useState('');
     const [memberFilter, setMemberFilter] = useState('all');
+    const [userMap, setUserMap] = useState<{ [id: string]: { displayName: string; email: string } }>({});
 
     const fetchClubs = async () => {
         try {
@@ -52,6 +53,11 @@ export default function Clubs() {
 
     useEffect(() => {
         fetchClubs();
+        userServices.getAll().then(users => {
+            const map: { [id: string]: { displayName: string; email: string } } = {};
+            users.forEach(u => { map[u.id] = { displayName: u.displayName, email: u.email }; });
+            setUserMap(map);
+        });
     }, []);
 
     const filteredClubs = useMemo(() => {
@@ -94,8 +100,8 @@ export default function Clubs() {
             } else {
                 await clubServices.create({
                     ...formData,
-                    adminIds: [],
                     memberIds: [],
+                    memberRoles: {},
                     eventIds: []
                 });
             }
@@ -202,6 +208,28 @@ export default function Clubs() {
                                     color="secondary"
                                     variant="outlined"
                                 />
+                            </Box>
+                            <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Üyeler:</Typography>
+                                {!Array.isArray(club.memberIds) || club.memberIds.length === 0 ? (
+                                    <Typography variant="body2" color="text.secondary">Üye yok</Typography>
+                                ) : (
+                                    club.memberIds
+                                        .filter(uid => !!uid && userMap[uid])
+                                        .map(uid => (
+                                            <Box key={uid} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                                <Typography variant="body2">
+                                                    {userMap[uid].displayName}
+                                                    {userMap[uid].email ? ` (${userMap[uid].email})` : ''}
+                                                    {club.memberRoles && club.memberRoles[uid]
+                                                        ? ` - ${club.memberRoles[uid] === 'admin'
+                                                            ? 'Yönetici'
+                                                            : 'Üye'}`
+                                                        : ''}
+                                                </Typography>
+                                            </Box>
+                                        ))
+                                )}
                             </Box>
                             <Box sx={{ mt: 2, display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                                 <Button

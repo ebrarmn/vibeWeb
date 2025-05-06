@@ -15,8 +15,24 @@ import {
     Business as BusinessIcon,
     Event as EventIcon,
     Add as AddIcon,
-    TrendingUp as TrendingUpIcon
+    TrendingUp as TrendingUpIcon,
+    FormatItalic
 } from '@mui/icons-material';
+import {
+    LineChart,
+    Line,
+    BarChart,
+    Bar,
+    PieChart,
+    Pie,
+    Cell,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+    ResponsiveContainer
+} from 'recharts';
 import { clubServices, userServices, eventServices } from '../services/firestore';
 import seedData from '../utils/seedData';
 
@@ -26,6 +42,22 @@ interface StatCardProps {
     icon: React.ReactNode;
     trend?: number;
     color?: string;
+}
+
+interface ChartData {
+    userGrowth: Array<{
+        date: string;
+        users: number;
+    }>;
+    eventDistribution: Array<{
+        name: string;
+        events: number;
+    }>;
+    clubActivity: Array<{
+        name: string;
+        members: number;
+        events: number;
+    }>;
 }
 
 function StatCard({ title, count, icon, trend, color }: StatCardProps) {
@@ -98,6 +130,11 @@ export default function Dashboard() {
     });
     const [loading, setLoading] = useState(true);
     const [seeding, setSeeding] = useState(false);
+    const [chartData, setChartData] = useState<ChartData>({
+        userGrowth: [],
+        eventDistribution: [],
+        clubActivity: []
+    });
 
     const fetchStats = async () => {
         try {
@@ -107,10 +144,43 @@ export default function Dashboard() {
                 eventServices.getAll()
             ]);
 
+            // Kullanıcı büyüme verisi
+            const userGrowthData = users.map(user => ({
+                date: new Date(user.createdAt).toLocaleDateString(),
+                users: users.filter(u => new Date(u.createdAt) <= new Date(user.createdAt)).length
+            }));
+
+            // Etkinlik dağılımı verisi
+            const eventDistributionData: Array<{ name: string; events: number }> = events.reduce((acc, event) => {
+                const club = clubs.find(c => c.id === event.clubId);
+                if (club) {
+                    const existingClub = acc.find(item => item.name === club.name);
+                    if (existingClub) {
+                        existingClub.events++;
+                    } else {
+                        acc.push({ name: club.name, events: 1 });
+                    }
+                }
+                return acc;
+            }, [] as Array<{ name: string; events: number }>);
+
+            // Kulüp aktivite verisi
+            const clubActivityData = clubs.map(club => ({
+                name: club.name,
+                members: club.memberIds.length,
+                events: events.filter(e => e.clubId === club.id).length
+            }));
+
             setStats({
                 userCount: users.length,
                 clubCount: clubs.length,
                 eventCount: events.length
+            });
+
+            setChartData({
+                userGrowth: userGrowthData,
+                eventDistribution: eventDistributionData,
+                clubActivity: clubActivityData
             });
         } catch (error) {
             console.error('İstatistikler yüklenirken hata oluştu:', error);
@@ -150,7 +220,7 @@ export default function Dashboard() {
 
     return (
         <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-            <Box sx={{ mb: 4 }}>
+            <Box sx={{ mb: 6 }}>
                 <Box
                     display="flex"
                     justifyContent="space-between"
@@ -158,9 +228,9 @@ export default function Dashboard() {
                     sx={{ mb: 3 }}
                 >
                     <Typography
-                        variant="h4"
+                        variant="h3"
                         sx={{
-                            fontWeight: 'bold',
+                            fontWeight: 'FormatItalic',
                             background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
                             backgroundClip: 'text',
                             textFillColor: 'transparent',
@@ -191,7 +261,7 @@ export default function Dashboard() {
                 </Typography>
             </Box>
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 3 }}>
+            <Box sx={{ mb: 6, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 3 }}>
                 <Box>
                     <StatCard
                         title="Toplam Kullanıcı"
@@ -219,6 +289,249 @@ export default function Dashboard() {
                         color={theme.palette.success.main}
                     />
                 </Box>
+            </Box>
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 4 }}>
+                    {/* Kullanıcı Büyüme Grafiği */}
+                    <Paper 
+                        elevation={2} 
+                        sx={{ 
+                            p: 3, 
+                            height: '340px',
+                            borderRadius: 2,
+                            background: `linear-gradient(145deg, ${alpha(theme.palette.background.paper, 0.8)}, ${alpha(theme.palette.background.paper, 0.95)})`,
+                            backdropFilter: 'blur(10px)',
+                            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                        }}
+                    >
+                        <Typography variant="h6" gutterBottom sx={{ fontWeight: 500, mb: 2 }}>
+                            Kullanıcı Büyüme Grafiği
+                        </Typography>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={chartData.userGrowth} margin={{ top: 20, right: 40, left: 20, bottom: 30 }}>
+                                <CartesianGrid 
+                                    strokeDasharray="3 3" 
+                                    stroke={alpha(theme.palette.divider, 0.1)}
+                                    vertical={false}
+                                />
+                                <XAxis 
+                                    dataKey="date" 
+                                    tick={{ fontSize: 11 }}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    angle={-45}
+                                    textAnchor="end"
+                                    height={60}
+                                    padding={{ left: 20, right: 20 }}
+                                />
+                                <YAxis 
+                                    tick={{ fontSize: 11 }}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    width={40}
+                                    padding={{ top: 20, bottom: 20 }}
+                                />
+                                <Tooltip 
+                                    contentStyle={{
+                                        background: alpha(theme.palette.background.default, 0.9),
+                                        border: 'none',
+                                        borderRadius: 8,
+                                        boxShadow: theme.shadows[2],
+                                        fontSize: '12px',
+                                        padding: '8px 12px'
+                                    }}
+                                    wrapperStyle={{
+                                        color: '#fff',
+                                        outline: 'none'
+                                    }}
+                                    itemStyle={{
+                                        color: '#fff'
+                                    }}
+                                    labelStyle={{
+                                        color: '#fff'
+                                    }}
+                                />
+                                <Legend 
+                                    verticalAlign="top" 
+                                    height={36}
+                                    wrapperStyle={{ 
+                                        paddingBottom: 10,
+                                        fontSize: '12px'
+                                    }}
+                                />
+                                <Line
+                                    type="monotone"
+                                    dataKey="users"
+                                    stroke={theme.palette.primary.main}
+                                    strokeWidth={2}
+                                    dot={{ r: 4, fill: theme.palette.primary.main }}
+                                    activeDot={{ r: 6, fill: theme.palette.primary.main }}
+                                    name="Kullanıcı Sayısı"
+                                />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </Paper>
+
+                    {/* Etkinlik Dağılımı Grafiği */}
+                    <Paper 
+                        elevation={2} 
+                        sx={{ 
+                            p: 3, 
+                            height: '340px',
+                            borderRadius: 2,
+                            background: `linear-gradient(145deg, ${alpha(theme.palette.background.paper, 0.8)}, ${alpha(theme.palette.background.paper, 0.95)})`,
+                            backdropFilter: 'blur(10px)',
+                            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                        }}
+                    >
+                        <Typography variant="h6" gutterBottom sx={{ fontWeight: 500, mb: 2 }}>
+                            Etkinlik Dağılımı
+                        </Typography>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart margin={{ top: 20, right: 40, left: 20, bottom: 30 }}>
+                                <Pie
+                                    data={chartData.eventDistribution}
+                                    dataKey="events"
+                                    nameKey="name"
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={50}
+                                    outerRadius={70}
+                                    paddingAngle={5}
+                                    label={({ name, percent }) => {
+                                        const percentage = (percent * 100).toFixed(0);
+                                        return `${percentage}%`;
+                                    }}
+                                    labelLine={false}
+                                >
+                                    {chartData.eventDistribution.map((entry, index) => (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={[theme.palette.primary.main, theme.palette.secondary.main, theme.palette.success.main][index % 3]}
+                                            stroke={theme.palette.background.paper}
+                                            strokeWidth={2}
+                                        />
+                                    ))}
+                                </Pie>
+                                <Tooltip 
+                                    contentStyle={{
+                                        background: '#1a1a1a',
+                                        border: 'none',
+                                        borderRadius: 8,
+                                        boxShadow: theme.shadows[2],
+                                        fontSize: '12px',
+                                        padding: '8px 12px'
+                                    }}
+                                    wrapperStyle={{
+                                        color: '#fff',
+                                        outline: 'none'
+                                    }}
+                                    itemStyle={{
+                                        color: '#fff'
+                                    }}
+                                    labelStyle={{
+                                        color: '#fff'
+                                    }}
+                                />
+                                <Legend 
+                                    verticalAlign="bottom"
+                                    height={36}
+                                    wrapperStyle={{ 
+                                        paddingTop: 20,
+                                        fontSize: '12px'
+                                    }}
+                                />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </Paper>
+                </Box>
+
+                {/* Kulüp Aktivite Grafiği */}
+                <Paper 
+                    elevation={2} 
+                    sx={{ 
+                        p: 3, 
+                        height: '340px',
+                        borderRadius: 2,
+                        background: `linear-gradient(145deg, ${alpha(theme.palette.background.paper, 0.8)}, ${alpha(theme.palette.background.paper, 0.95)})`,
+                        backdropFilter: 'blur(10px)',
+                        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                    }}
+                >
+                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 500, mb: 2 }}>
+                        Kulüp Aktivite Analizi
+                    </Typography>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData.clubActivity} margin={{ top: 20, right: 40, left: 20, bottom: 30 }}>
+                            <CartesianGrid 
+                                strokeDasharray="3 3" 
+                                stroke={alpha(theme.palette.divider, 0.1)}
+                                vertical={false}
+                            />
+                            <XAxis 
+                                dataKey="name" 
+                                tick={{ fontSize: 11 }}
+                                tickLine={false}
+                                axisLine={false}
+                                interval={0}
+                                angle={-45}
+                                textAnchor="end"
+                                height={60}
+                                padding={{ left: 20, right: 20 }}
+                            />
+                            <YAxis 
+                                tick={{ fontSize: 11 }}
+                                tickLine={false}
+                                axisLine={false}
+                                width={40}
+                                padding={{ top: 20, bottom: 20 }}
+                            />
+                            <Tooltip 
+                                contentStyle={{
+                                    background: '#1a1a1a',
+                                    border: 'none',
+                                    borderRadius: 8,
+                                    boxShadow: theme.shadows[2],
+                                    fontSize: '12px',
+                                    padding: '8px 12px'
+                                }}
+                                wrapperStyle={{
+                                    color: '#fff',
+                                    outline: 'none'
+                                }}
+                                itemStyle={{
+                                    color: '#fff'
+                                }}
+                                labelStyle={{
+                                    color: '#fff'
+                                }}
+                            />
+                            <Legend 
+                                verticalAlign="top"
+                                height={36}
+                                wrapperStyle={{ 
+                                    paddingBottom: 10,
+                                    fontSize: '12px'
+                                }}
+                            />
+                            <Bar
+                                dataKey="members"
+                                fill={theme.palette.primary.main}
+                                name="Üye Sayısı"
+                                radius={[4, 4, 0, 0]}
+                                maxBarSize={40}
+                            />
+                            <Bar
+                                dataKey="events"
+                                fill={theme.palette.secondary.main}
+                                name="Etkinlik Sayısı"
+                                radius={[4, 4, 0, 0]}
+                                maxBarSize={40}
+                            />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </Paper>
             </Box>
         </Container>
     );

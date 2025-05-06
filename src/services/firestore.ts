@@ -17,6 +17,7 @@ import { Club, User, Event } from '../types/models';
 const clubsRef = collection(db, 'clubs');
 const usersRef = collection(db, 'users');
 const eventsRef = collection(db, 'events');
+const pendingClubsRef = collection(db, 'pendingClubs');
 
 // Kulüp servisleri
 export const clubServices = {
@@ -74,6 +75,32 @@ export const clubServices = {
 
     async delete(id: string): Promise<void> {
         await deleteDoc(doc(clubsRef, id));
+    },
+
+    async addMember(clubId: string, userId: string, role: 'admin' | 'member'): Promise<void> {
+        const clubRef = doc(clubsRef, clubId);
+        const club = await this.getById(clubId);
+        if (!club) throw new Error('Club not found');
+
+        await updateDoc(clubRef, {
+            memberIds: [...club.memberIds, userId],
+            [`memberRoles.${userId}`]: role,
+            updatedAt: new Date()
+        });
+    },
+
+    async removeMember(clubId: string, userId: string): Promise<void> {
+        const clubRef = doc(clubsRef, clubId);
+        const club = await this.getById(clubId);
+        if (!club) throw new Error('Club not found');
+
+        const { [userId]: removedRole, ...remainingRoles } = club.memberRoles;
+        
+        await updateDoc(clubRef, {
+            memberIds: club.memberIds.filter(id => id !== userId),
+            memberRoles: remainingRoles,
+            updatedAt: new Date()
+        });
     }
 };
 
@@ -133,40 +160,76 @@ export const userServices = {
 
     async delete(id: string): Promise<void> {
         await deleteDoc(doc(usersRef, id));
+    },
+
+    async joinClub(userId: string, clubId: string, role: 'admin' | 'member'): Promise<void> {
+        const userRef = doc(usersRef, userId);
+        const user = await this.getById(userId);
+        if (!user) throw new Error('User not found');
+
+        await updateDoc(userRef, {
+            clubIds: [...user.clubIds, clubId],
+            [`clubRoles.${clubId}`]: role,
+            updatedAt: new Date()
+        });
+    },
+
+    async leaveClub(userId: string, clubId: string): Promise<void> {
+        const userRef = doc(usersRef, userId);
+        const user = await this.getById(userId);
+        if (!user) throw new Error('User not found');
+
+        const { [clubId]: removedRole, ...remainingRoles } = user.clubRoles;
+
+        await updateDoc(userRef, {
+            clubIds: user.clubIds.filter(id => id !== clubId),
+            clubRoles: remainingRoles,
+            updatedAt: new Date()
+        });
     }
 };
 
 // Etkinlik servisleri
 export const eventServices = {
     async getAll(): Promise<Event[]> {
-        const snapshot = await getDocs(eventsRef);
-        return snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                startDate: data.startDate instanceof Timestamp ? data.startDate.toDate().toISOString() : data.startDate,
-                endDate: data.endDate instanceof Timestamp ? data.endDate.toDate().toISOString() : data.endDate,
-                createdAt: (data.createdAt as Timestamp).toDate(),
-                updatedAt: (data.updatedAt as Timestamp).toDate()
-            } as Event;
-        });
+        try {
+            const snapshot = await getDocs(eventsRef);
+            return snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    startDate: data.startDate instanceof Timestamp ? data.startDate.toDate().toISOString() : data.startDate,
+                    endDate: data.endDate instanceof Timestamp ? data.endDate.toDate().toISOString() : data.endDate,
+                    createdAt: data.createdAt?.toDate() || new Date(),
+                    updatedAt: data.updatedAt?.toDate() || new Date()
+                } as Event;
+            });
+        } catch (error) {
+            console.error('Error fetching events:', error);
+            return [];
+        }
     },
 
-    async getByClubId(clubId: string): Promise<Event[]> {
-        const q = query(eventsRef, where("clubId", "==", clubId));
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => {
-            const data = doc.data();
+    async getById(id: string): Promise<Event | null> {
+        try {
+            const docRef = doc(eventsRef, id);
+            const docSnap = await getDoc(docRef);
+            if (!docSnap.exists()) return null;
+            
+            const data = docSnap.data();
             return {
-                id: doc.id,
+                id: docSnap.id,
                 ...data,
                 startDate: data.startDate instanceof Timestamp ? data.startDate.toDate().toISOString() : data.startDate,
                 endDate: data.endDate instanceof Timestamp ? data.endDate.toDate().toISOString() : data.endDate,
-                createdAt: (data.createdAt as Timestamp).toDate(),
-                updatedAt: (data.updatedAt as Timestamp).toDate()
+                createdAt: data.createdAt?.toDate() || new Date(),
+                updatedAt: data.updatedAt?.toDate() || new Date()
             } as Event;
-        });
+        } catch (error) {
+            console.error('Error fetching event by ID:', error);
+            return null;
+        }
     },
 
     async create(event: Omit<Event, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
@@ -189,5 +252,80 @@ export const eventServices = {
 
     async delete(id: string): Promise<void> {
         await deleteDoc(doc(eventsRef, id));
+    },
+
+    async getByClubId(clubId: string): Promise<Event[]> {
+        const q = query(eventsRef, where("clubId", "==", clubId));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                startDate: data.startDate instanceof Timestamp ? data.startDate.toDate().toISOString() : data.startDate,
+                endDate: data.endDate instanceof Timestamp ? data.endDate.toDate().toISOString() : data.endDate,
+                createdAt: data.createdAt?.toDate() || new Date(),
+                updatedAt: data.updatedAt?.toDate() || new Date()
+            } as Event;
+        });
+    },
+
+    async registerAttendee(eventId: string, userId: string): Promise<void> {
+        const eventRef = doc(eventsRef, eventId);
+        const event = await this.getById(eventId);
+        if (!event) throw new Error('Event not found');
+
+        await updateDoc(eventRef, {
+            attendeeIds: [...event.attendeeIds, userId],
+            [`attendeeStatus.${userId}`]: 'registered',
+            updatedAt: new Date()
+        });
+    },
+
+    async updateAttendeeStatus(eventId: string, userId: string, status: 'registered' | 'attended' | 'cancelled'): Promise<void> {
+        const eventRef = doc(eventsRef, eventId);
+        await updateDoc(eventRef, {
+            [`attendeeStatus.${userId}`]: status,
+            updatedAt: new Date()
+        });
+    },
+
+    async removeAttendee(eventId: string, userId: string): Promise<void> {
+        const eventRef = doc(eventsRef, eventId);
+        const event = await this.getById(eventId);
+        if (!event) throw new Error('Event not found');
+
+        const { [userId]: removedStatus, ...remainingStatus } = event.attendeeStatus;
+
+        await updateDoc(eventRef, {
+            attendeeIds: event.attendeeIds.filter(id => id !== userId),
+            attendeeStatus: remainingStatus,
+            updatedAt: new Date()
+        });
+    }
+};
+
+export const pendingClubServices = {
+    async getAll(): Promise<any[]> {
+        const snapshot = await getDocs(pendingClubsRef);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+    async approve(pendingClub: any): Promise<void> {
+        // Yeni kulüp oluştur
+        const clubData = {
+            name: pendingClub.name,
+            description: pendingClub.description,
+            memberIds: [pendingClub.createdBy],
+            memberRoles: { [pendingClub.createdBy]: 'admin' },
+            eventIds: [],
+            createdAt: new Date(),
+            updatedAt: new Date()
+        };
+        await addDoc(clubsRef, clubData);
+        // Başvuruyu sil
+        await deleteDoc(doc(pendingClubsRef, pendingClub.id));
+    },
+    async reject(pendingClubId: string): Promise<void> {
+        await deleteDoc(doc(pendingClubsRef, pendingClubId));
     }
 }; 

@@ -23,6 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         displayName: 'Admin',
         role: 'admin',
         clubIds: [],
+        clubRoles: {},
         createdAt: new Date(),
         updatedAt: new Date()
     });
