@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Clubs from './pages/Clubs';
 import Users from './pages/Users';
 import Events from './pages/Events';
+import ClubRequests from './pages/ClubRequests';
 import { AuthProvider } from './contexts/AuthContext';
 
 const theme = createTheme({
@@ -33,6 +34,7 @@ function App() {
               <Route path="clubs" element={<Clubs />} />
               <Route path="users" element={<Users />} />
               <Route path="events" element={<Events />} />
+              <Route path="club-requests" element={<ClubRequests />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>
           </Routes>

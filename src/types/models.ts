@@ -4,8 +4,8 @@ export interface Club {
     description: string;
     createdAt: Date;
     updatedAt: Date;
-    adminIds: string[];
     memberIds: string[];
+    memberRoles: { [userId: string]: 'admin' | 'member' };
     eventIds: string[];
 }
 
@@ -16,6 +16,7 @@ export interface User {
     photoURL?: string;
     role: 'admin' | 'user';
     clubIds: string[];
+    clubRoles: { [clubId: string]: 'admin' | 'member' };
     createdAt: Date;
     updatedAt: Date;
 }
@@ -31,6 +32,7 @@ export interface Event {
     location: string;
     capacity: number;
     attendeeIds: string[];
+    attendeeStatus: { [userId: string]: 'registered' | 'attended' | 'cancelled' };
     createdAt: Date;
     updatedAt: Date;
 } 

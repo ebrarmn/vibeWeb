@@ -14,7 +14,13 @@ import {
     DialogContent,
     DialogActions,
     TextField,
-    Avatar
+    Avatar,
+    Checkbox,
+    List,
+    ListItem,
+    ListItemText,
+    ListItemSecondaryAction,
+    Divider
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -24,8 +30,8 @@ import {
     Business as BusinessIcon,
     AdminPanelSettings as AdminIcon
 } from '@mui/icons-material';
-import { userServices } from '../services/firestore';
-import { User } from '../types/models';
+import { userServices, clubServices, eventServices } from '../services/firestore';
+import { User, Club, Event } from '../types/models';
 import SearchBar from '../components/SearchBar';
 
 export default function Users() {
@@ -37,11 +43,12 @@ export default function Users() {
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
     const [clubFilter, setClubFilter] = useState('all');
+    const [clubMap, setClubMap] = useState<{ [id: string]: string }>({});
+    const [manageUser, setManageUser] = useState<User | null>(null);
 
     const [formData, setFormData] = useState({
         email: '',
-        displayName: '',
-        role: 'user' as 'admin' | 'user'
+        displayName: ''
     });
 
     const fetchUsers = async () => {
@@ -57,6 +64,11 @@ export default function Users() {
 
     useEffect(() => {
         fetchUsers();
+        clubServices.getAll().then(clubs => {
+            const map: { [id: string]: string } = {};
+            clubs.forEach(club => { map[club.id] = club.name; });
+            setClubMap(map);
+        });
     }, []);
 
     const filteredUsers = useMemo(() => {
@@ -103,8 +115,7 @@ export default function Users() {
         setSelectedUser(null);
         setFormData({
             email: '',
-            displayName: '',
-            role: 'user'
+            displayName: ''
         });
     };
 
@@ -112,14 +123,14 @@ export default function Users() {
         try {
             if (selectedUser) {
                 await userServices.update(selectedUser.id, {
-                    ...formData,
-                    role: formData.role as 'admin' | 'user'
+                    ...formData
                 });
             } else {
                 await userServices.create({
                     ...formData,
-                    role: formData.role as 'admin' | 'user',
-                    clubIds: []
+                    role: 'user',
+                    clubIds: [],
+                    clubRoles: {}
                 });
             }
             fetchUsers();
@@ -192,6 +203,7 @@ export default function Users() {
                                 boxShadow: theme.shadows[4]
                             }
                         }}
+                        onClick={() => setManageUser(user)}
                     >
                         <CardContent>
                             <Box
@@ -237,7 +249,7 @@ export default function Users() {
                                 />
                                 <Chip
                                     icon={<BusinessIcon />}
-                                    label={`${user.clubIds.length} Kulüp`}
+                                    label={user.clubIds.length === 0 ? 'Kulüp Yok' : user.clubIds.map(id => clubMap[id]).filter(Boolean).join(', ')}
                                     size="small"
                                     color="primary"
                                     variant="outlined"
@@ -247,12 +259,12 @@ export default function Users() {
                                 <Button
                                     size="small"
                                     startIcon={<EditIcon />}
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                        e.stopPropagation();
                                         setSelectedUser(user);
                                         setFormData({
                                             email: user.email,
-                                            displayName: user.displayName,
-                                            role: user.role
+                                            displayName: user.displayName
                                         });
                                         setOpen(true);
                                     }}
@@ -263,7 +275,10 @@ export default function Users() {
                                     size="small"
                                     color="error"
                                     startIcon={<DeleteIcon />}
-                                    onClick={() => handleDelete(user.id)}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDelete(user.id);
+                                    }}
                                 >
                                     Sil
                                 </Button>
@@ -309,20 +324,6 @@ export default function Users() {
                         value={formData.displayName}
                         onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
                     />
-                    <TextField
-                        select
-                        margin="dense"
-                        label="Rol"
-                        fullWidth
-                        value={formData.role}
-                        onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'user' })}
-                        SelectProps={{
-                            native: true
-                        }}
-                    >
-                        <option value="user">Kullanıcı</option>
-                        <option value="admin">Yönetici</option>
-                    </TextField>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleClose}>İptal</Button>
@@ -331,6 +332,112 @@ export default function Users() {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            <UserManageModal
+                open={!!manageUser}
+                user={manageUser}
+                onClose={() => setManageUser(null)}
+                onUpdated={fetchUsers}
+            />
         </Container>
+    );
+}
+
+function UserManageModal({ open, onClose, user, onUpdated }: {
+    open: boolean;
+    onClose: () => void;
+    user: User | null;
+    onUpdated: () => void;
+}) {
+    const [clubs, setClubs] = useState<Club[]>([]);
+    const [events, setEvents] = useState<Event[]>([]);
+    const [selectedClubs, setSelectedClubs] = useState<string[]>([]);
+    const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!user) return;
+        setLoading(true);
+        Promise.all([
+            clubServices.getAll(),
+            eventServices.getAll()
+        ]).then(([clubs, events]) => {
+            setClubs(clubs);
+            setEvents(events);
+            setSelectedClubs(user.clubIds || []);
+            // Kullanıcının kulüplerine ait etkinliklerden katıldıkları
+            const userEventIds = events.filter(e => user.clubIds.includes(e.clubId) && e.attendeeIds.includes(user.id)).map(e => e.id);
+            setSelectedEvents(userEventIds);
+        }).finally(() => setLoading(false));
+    }, [user]);
+
+    if (!user) return null;
+
+    // Kulüp ekle/çıkar işlemi
+    const handleClubToggle = async (clubId: string) => {
+        if (selectedClubs.includes(clubId)) {
+            await userServices.leaveClub(user.id, clubId);
+            setSelectedClubs(selectedClubs.filter(id => id !== clubId));
+        } else {
+            await userServices.joinClub(user.id, clubId, 'member');
+            setSelectedClubs([...selectedClubs, clubId]);
+        }
+        onUpdated();
+    };
+
+    // Etkinlik ekle/çıkar işlemi
+    const handleEventToggle = async (eventId: string) => {
+        if (selectedEvents.includes(eventId)) {
+            await eventServices.removeAttendee(eventId, user.id);
+            setSelectedEvents(selectedEvents.filter(id => id !== eventId));
+        } else {
+            await eventServices.registerAttendee(eventId, user.id);
+            setSelectedEvents([...selectedEvents, eventId]);
+        }
+        onUpdated();
+    };
+
+    // Kullanıcının kulüplerine ait etkinlikler
+    const userClubsEvents = events.filter(e => selectedClubs.includes(e.clubId));
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+            <DialogTitle>Kullanıcı Yönetimi: {user.displayName}</DialogTitle>
+            <DialogContent>
+                <Typography variant="subtitle1" sx={{ mt: 1, mb: 1 }}>Kulüp Atama/Çıkarma</Typography>
+                <List dense>
+                    {clubs.map(club => (
+                        <ListItem key={club.id} button onClick={() => handleClubToggle(club.id)}>
+                            <Checkbox
+                                edge="start"
+                                checked={selectedClubs.includes(club.id)}
+                                tabIndex={-1}
+                                disableRipple
+                            />
+                            <ListItemText primary={club.name} secondary={club.description} />
+                        </ListItem>
+                    ))}
+                </List>
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="subtitle1" sx={{ mt: 1, mb: 1 }}>Etkinlik Atama/Çıkarma</Typography>
+                <List dense>
+                    {userClubsEvents.length === 0 && <Typography variant="body2">Kullanıcının kulüplerine ait etkinlik yok.</Typography>}
+                    {userClubsEvents.map(event => (
+                        <ListItem key={event.id} button onClick={() => handleEventToggle(event.id)}>
+                            <Checkbox
+                                edge="start"
+                                checked={selectedEvents.includes(event.id)}
+                                tabIndex={-1}
+                                disableRipple
+                            />
+                            <ListItemText primary={event.title} secondary={event.location} />
+                        </ListItem>
+                    ))}
+                </List>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Kapat</Button>
+            </DialogActions>
+        </Dialog>
     );
 } 
