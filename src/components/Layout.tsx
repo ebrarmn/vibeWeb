@@ -18,8 +18,12 @@ import {
     Dashboard as DashboardIcon,
     Group as GroupIcon,
     Event as EventIcon,
-    Business as BusinessIcon
+    Business as BusinessIcon,
+    Brightness4,
+    Brightness7
 } from '@mui/icons-material';
+import { useTheme } from '../context/ThemeContext';
+import Logo from './Logo';
 
 const drawerWidth = 240;
 
@@ -35,6 +39,7 @@ export default function Layout() {
     const [mobileOpen, setMobileOpen] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
+    const { mode, toggleTheme } = useTheme();
 
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);
@@ -42,7 +47,27 @@ export default function Layout() {
 
     const drawer = (
         <div>
-            <Toolbar />
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', px: 2, py: 2, bgcolor: 'background.paper', cursor: 'pointer' }}
+                onClick={() => navigate('/dashboard')}
+            >
+                <Logo />
+                <Typography
+                    variant="h6"
+                    sx={{
+                        ml: 1.5,
+                        fontWeight: 'bold',
+                        background: 'linear-gradient(90deg, #2196f3, #a259f7)',
+                        backgroundClip: 'text',
+                        WebkitBackgroundClip: 'text',
+                        color: 'transparent',
+                        WebkitTextFillColor: 'transparent',
+                        letterSpacing: 2,
+                        fontFamily: 'Segoe UI, Roboto, Helvetica, Arial, sans-serif',
+                    }}
+                >
+                    VIBE
+                </Typography>
+            </Box>
             <List>
                 {menuItems.map((item) => (
                     <ListItem
@@ -69,7 +94,8 @@ export default function Layout() {
                 sx={{
                     width: { sm: `calc(100% - ${drawerWidth}px)` },
                     ml: { sm: `${drawerWidth}px` },
-                    background: 'linear-gradient(45deg, #012130 40%, #4f0aff 90%)'
+                    background: 'linear-gradient(45deg, #012130 40%, #4f0aff 90%)',
+                    zIndex: (theme) => theme.zIndex.drawer + 1
                 }}
             >
                 <Toolbar>
@@ -90,11 +116,15 @@ export default function Layout() {
                             fontWeight: 'bold',
                             letterSpacing: '0.07em',
                             textShadow: '4px 4px 8px rgba(0,0,0,0.2)',
-                            fontFamily: '"Segoe UI", "Roboto", "Helvetica", "Arial", sans-serif'
+                            fontFamily: '"Segoe UI", "Roboto", "Helvetica", "Arial", sans-serif',
+                            flexGrow: 1
                         }}
                     >
                         VIBE-Virtual Interactive Belonging Engagement
                     </Typography>
+                    <IconButton color="inherit" onClick={toggleTheme}>
+                        {mode === 'dark' ? <Brightness7 /> : <Brightness4 />}
+                    </IconButton>
                 </Toolbar>
             </AppBar>
             <Box

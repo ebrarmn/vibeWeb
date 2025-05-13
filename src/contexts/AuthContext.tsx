@@ -19,7 +19,16 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [userData] = useState<User | null>({
         id: 'admin',
+        firstName: 'Admin',
+        lastName: 'User',
         email: 'admin@vibecom.com',
+        phone: '',
+        birthDate: '',
+        gender: '',
+        university: '',
+        faculty: '',
+        department: '',
+        grade: '',
         displayName: 'Admin',
         role: 'admin',
         clubIds: [],

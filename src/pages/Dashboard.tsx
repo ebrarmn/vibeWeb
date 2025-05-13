@@ -8,7 +8,8 @@ import {
     Container,
     Grid,
     useTheme,
-    alpha
+    alpha,
+    IconButton
 } from '@mui/material';
 import {
     Group as GroupIcon,
@@ -16,7 +17,8 @@ import {
     Event as EventIcon,
     Add as AddIcon,
     TrendingUp as TrendingUpIcon,
-    FormatItalic
+    FormatItalic,
+    Logout as LogoutIcon
 } from '@mui/icons-material';
 import {
     LineChart,
@@ -35,6 +37,7 @@ import {
 } from 'recharts';
 import { clubServices, userServices, eventServices } from '../services/firestore';
 import seedData from '../utils/seedData';
+import DatabaseManager from '../components/DatabaseManager';
 
 interface StatCardProps {
     title: string;
@@ -135,6 +138,11 @@ export default function Dashboard() {
         eventDistribution: [],
         clubActivity: []
     });
+
+    const handleLogout = () => {
+        // Firebase auth logout işlemi burada yapılacak
+        window.location.href = '/login';
+    };
 
     const fetchStats = async () => {
         try {
@@ -240,21 +248,17 @@ export default function Dashboard() {
                     >
                         Yönetici Paneli
                     </Typography>
-                    <Button
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        onClick={handleSeedData}
-                        disabled={seeding}
+                    <IconButton
+                        onClick={handleLogout}
                         sx={{
-                            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                            color: 'white',
+                            color: theme.palette.error.main,
                             '&:hover': {
-                                background: `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.secondary.dark})`
+                                backgroundColor: alpha(theme.palette.error.main, 0.1)
                             }
                         }}
                     >
-                        {seeding ? 'Yükleniyor...' : 'Test Verilerini Yükle'}
-                    </Button>
+                        <LogoutIcon />
+                    </IconButton>
                 </Box>
                 <Typography variant="body1" color="textSecondary">
                     Platformunuzun genel durumunu buradan takip edebilirsiniz.
@@ -532,6 +536,9 @@ export default function Dashboard() {
                         </BarChart>
                     </ResponsiveContainer>
                 </Paper>
+
+                {/* Veritabanı Yönetimi */}
+                <DatabaseManager />
             </Box>
         </Container>
     );

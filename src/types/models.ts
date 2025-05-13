@@ -11,7 +11,16 @@ export interface Club {
 
 export interface User {
     id: string;
+    firstName: string;
+    lastName: string;
     email: string;
+    phone: string;
+    birthDate: string;
+    gender: string;
+    university: string;
+    faculty: string;
+    department: string;
+    grade: string;
     displayName: string;
     photoURL?: string;
     role: 'admin' | 'user';

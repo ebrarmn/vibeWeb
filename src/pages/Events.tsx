@@ -13,7 +13,11 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
-    TextField
+    TextField,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -22,10 +26,11 @@ import {
     Event as EventIcon,
     LocationOn as LocationIcon,
     Group as GroupIcon,
-    CalendarMonth as CalendarIcon
+    CalendarMonth as CalendarIcon,
+    Business as BusinessIcon
 } from '@mui/icons-material';
-import { eventServices, userServices } from '../services/firestore';
-import { Event } from '../types/models';
+import { eventServices, userServices, clubServices } from '../services/firestore';
+import { Event, Club } from '../types/models';
 import SearchBar from '../components/SearchBar';
 import { format, isAfter, isBefore, isSameDay, parseISO } from 'date-fns';
 import { tr } from 'date-fns/locale';
@@ -40,6 +45,7 @@ export default function Events() {
     const [capacityFilter, setCapacityFilter] = useState('all');
     const [dateFilter, setDateFilter] = useState('all');
     const [userMap, setUserMap] = useState<{ [id: string]: { displayName: string; email: string } }>({});
+    const [clubs, setClubs] = useState<Club[]>([]);
 
     const [formData, setFormData] = useState({
         title: '',
@@ -47,7 +53,8 @@ export default function Events() {
         location: '',
         startDate: '',
         endDate: '',
-        capacity: ''
+        capacity: '',
+        clubId: ''
     });
 
     const fetchEvents = async () => {
@@ -63,10 +70,14 @@ export default function Events() {
 
     useEffect(() => {
         fetchEvents();
-        userServices.getAll().then(users => {
+        Promise.all([
+            userServices.getAll(),
+            clubServices.getAll()
+        ]).then(([users, fetchedClubs]) => {
             const map: { [id: string]: { displayName: string; email: string } } = {};
             users.forEach(u => { map[u.id] = { displayName: u.displayName, email: u.email }; });
             setUserMap(map);
+            setClubs(fetchedClubs);
         });
     }, []);
 
@@ -146,7 +157,8 @@ export default function Events() {
             location: '',
             startDate: '',
             endDate: '',
-            capacity: ''
+            capacity: '',
+            clubId: ''
         });
     };
 
@@ -156,7 +168,8 @@ export default function Events() {
                 ...formData,
                 capacity: parseInt(formData.capacity) || 0,
                 startDate: formData.startDate || '',
-                endDate: formData.endDate || ''
+                endDate: formData.endDate || '',
+                clubId: formData.clubId
             };
 
             if (selectedEvent) {
@@ -164,7 +177,6 @@ export default function Events() {
             } else {
                 await eventServices.create({
                     ...eventData,
-                    clubId: '',
                     attendeeIds: [],
                     attendeeStatus: {}
                 });
@@ -262,6 +274,12 @@ export default function Events() {
                                 }}
                             >
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <BusinessIcon fontSize="small" color="action" />
+                                    <Typography variant="body2">
+                                        {clubs.find(c => c.id === event.clubId)?.name || 'Bilinmeyen Kulüp'}
+                                    </Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                     <LocationIcon fontSize="small" color="action" />
                                     <Typography variant="body2">{event.location}</Typography>
                                 </Box>
@@ -323,7 +341,8 @@ export default function Events() {
                                             location: event.location,
                                             startDate: event.startDate,
                                             endDate: event.endDate,
-                                            capacity: event.capacity.toString()
+                                            capacity: event.capacity.toString(),
+                                            clubId: event.clubId
                                         });
                                         setOpen(true);
                                     }}
@@ -364,6 +383,20 @@ export default function Events() {
             <Dialog open={open} onClose={handleClose}>
                 <DialogTitle>{selectedEvent ? 'Etkinliği Düzenle' : 'Yeni Etkinlik Ekle'}</DialogTitle>
                 <DialogContent>
+                    <FormControl fullWidth margin="dense">
+                        <InputLabel>Kulüp</InputLabel>
+                        <Select
+                            value={formData.clubId}
+                            label="Kulüp"
+                            onChange={(e) => setFormData({ ...formData, clubId: e.target.value })}
+                        >
+                            {clubs.map((club) => (
+                                <MenuItem key={club.id} value={club.id}>
+                                    {club.name}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
                     <TextField
                         autoFocus
                         margin="dense"
@@ -417,7 +450,11 @@ export default function Events() {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleClose}>İptal</Button>
-                    <Button onClick={handleSubmit} variant="contained">
+                    <Button 
+                        onClick={handleSubmit} 
+                        variant="contained"
+                        disabled={!formData.clubId}
+                    >
                         {selectedEvent ? 'Güncelle' : 'Ekle'}
                     </Button>
                 </DialogActions>

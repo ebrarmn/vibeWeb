@@ -20,7 +20,11 @@ import {
     ListItem,
     ListItemText,
     ListItemSecondaryAction,
-    Divider
+    Divider,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    Select
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -45,11 +49,37 @@ export default function Users() {
     const [clubFilter, setClubFilter] = useState('all');
     const [clubMap, setClubMap] = useState<{ [id: string]: string }>({});
     const [manageUser, setManageUser] = useState<User | null>(null);
-
-    const [formData, setFormData] = useState({
+    const [clubs, setClubs] = useState<Club[]>([]);
+    const [formData, setFormData] = useState<{
+        firstName: string;
+        lastName: string;
+        email: string;
+        password: string;
+        phone: string;
+        birthDate: string;
+        gender: string;
+        university: string;
+        faculty: string;
+        department: string;
+        grade: string;
+        role: 'user' | 'admin';
+        clubId: string;
+    }>({
+        firstName: '',
+        lastName: '',
         email: '',
-        displayName: ''
+        password: '',
+        phone: '',
+        birthDate: '',
+        gender: '',
+        university: '',
+        faculty: '',
+        department: '',
+        grade: '',
+        role: 'user',
+        clubId: ''
     });
+    const [formError, setFormError] = useState<string>('');
 
     const fetchUsers = async () => {
         try {
@@ -65,6 +95,7 @@ export default function Users() {
     useEffect(() => {
         fetchUsers();
         clubServices.getAll().then(clubs => {
+            setClubs(clubs);
             const map: { [id: string]: string } = {};
             clubs.forEach(club => { map[club.id] = club.name; });
             setClubMap(map);
@@ -114,28 +145,88 @@ export default function Users() {
         setOpen(false);
         setSelectedUser(null);
         setFormData({
+            firstName: '',
+            lastName: '',
             email: '',
-            displayName: ''
+            password: '',
+            phone: '',
+            birthDate: '',
+            gender: '',
+            university: '',
+            faculty: '',
+            department: '',
+            grade: '',
+            role: 'user',
+            clubId: ''
         });
     };
 
     const handleSubmit = async () => {
+        setFormError('');
+        if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.phone || !formData.birthDate || !formData.gender || !formData.university || !formData.faculty || !formData.department || !formData.grade || !formData.role) {
+            setFormError('Tüm alanları doldurmalısınız.');
+            return;
+        }
+        if (formData.role === 'admin' && !formData.clubId) {
+            setFormError('Yönetici için kulüp seçmelisiniz.');
+            return;
+        }
         try {
             if (selectedUser) {
                 await userServices.update(selectedUser.id, {
-                    ...formData
+                    ...formData,
+                    displayName: formData.firstName + ' ' + formData.lastName,
+                    role: formData.role,
                 });
             } else {
-                await userServices.create({
-                    ...formData,
-                    role: 'user',
-                    clubIds: [],
-                    clubRoles: {}
-                });
+                let newUserId = '';
+                if (formData.role === 'admin') {
+                    const userObj = {
+                        firstName: formData.firstName,
+                        lastName: formData.lastName,
+                        email: formData.email,
+                        password: formData.password,
+                        phone: formData.phone,
+                        birthDate: formData.birthDate,
+                        gender: formData.gender,
+                        university: formData.university,
+                        faculty: formData.faculty,
+                        department: formData.department,
+                        grade: formData.grade,
+                        displayName: formData.firstName + ' ' + formData.lastName,
+                        role: 'admin' as const,
+                        clubIds: [formData.clubId],
+                        clubRoles: { [formData.clubId]: 'admin' as const }
+                    };
+                    const { password, ...userDataForFirestore } = userObj;
+                    newUserId = await userServices.create(userDataForFirestore);
+                    await clubServices.addMember(formData.clubId, newUserId, 'admin');
+                } else {
+                    const userObj = {
+                        firstName: formData.firstName,
+                        lastName: formData.lastName,
+                        email: formData.email,
+                        password: formData.password,
+                        phone: formData.phone,
+                        birthDate: formData.birthDate,
+                        gender: formData.gender,
+                        university: formData.university,
+                        faculty: formData.faculty,
+                        department: formData.department,
+                        grade: formData.grade,
+                        displayName: formData.firstName + ' ' + formData.lastName,
+                        role: 'user' as const,
+                        clubIds: [],
+                        clubRoles: {}
+                    };
+                    const { password, ...userDataForFirestore } = userObj;
+                    await userServices.create(userDataForFirestore);
+                }
             }
             fetchUsers();
             handleClose();
         } catch (error) {
+            setFormError('Kullanıcı kaydedilirken hata oluştu.');
             console.error('Kullanıcı kaydedilirken hata oluştu:', error);
         }
     };
@@ -263,8 +354,19 @@ export default function Users() {
                                         e.stopPropagation();
                                         setSelectedUser(user);
                                         setFormData({
+                                            firstName: user.firstName,
+                                            lastName: user.lastName,
                                             email: user.email,
-                                            displayName: user.displayName
+                                            password: '',
+                                            phone: user.phone,
+                                            birthDate: user.birthDate,
+                                            gender: user.gender,
+                                            university: user.university,
+                                            faculty: user.faculty,
+                                            department: user.department,
+                                            grade: user.grade,
+                                            role: user.role,
+                                            clubId: user.clubIds.length > 0 ? user.clubIds[0] : ''
                                         });
                                         setOpen(true);
                                     }}
@@ -309,7 +411,20 @@ export default function Users() {
                 <DialogTitle>{selectedUser ? 'Kullanıcıyı Düzenle' : 'Yeni Kullanıcı Ekle'}</DialogTitle>
                 <DialogContent>
                     <TextField
-                        autoFocus
+                        margin="dense"
+                        label="Ad"
+                        fullWidth
+                        value={formData.firstName}
+                        onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    />
+                    <TextField
+                        margin="dense"
+                        label="Soyad"
+                        fullWidth
+                        value={formData.lastName}
+                        onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    />
+                    <TextField
                         margin="dense"
                         label="E-posta"
                         type="email"
@@ -319,11 +434,94 @@ export default function Users() {
                     />
                     <TextField
                         margin="dense"
-                        label="Ad Soyad"
+                        label="Şifre"
+                        type="password"
                         fullWidth
-                        value={formData.displayName}
-                        onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     />
+                    <TextField
+                        margin="dense"
+                        label="Telefon"
+                        fullWidth
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    />
+                    <TextField
+                        margin="dense"
+                        label="Doğum Tarihi"
+                        type="date"
+                        fullWidth
+                        InputLabelProps={{ shrink: true }}
+                        value={formData.birthDate}
+                        onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                    />
+                    <FormControl fullWidth margin="dense">
+                        <InputLabel>Cinsiyet</InputLabel>
+                        <Select
+                            value={formData.gender}
+                            label="Cinsiyet"
+                            onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                        >
+                            <MenuItem value="Kadın">Kadın</MenuItem>
+                            <MenuItem value="Erkek">Erkek</MenuItem>
+                            <MenuItem value="Belirtmek istemiyorum">Belirtmek istemiyorum</MenuItem>
+                        </Select>
+                    </FormControl>
+                    <TextField
+                        margin="dense"
+                        label="Üniversite"
+                        fullWidth
+                        value={formData.university}
+                        onChange={(e) => setFormData({ ...formData, university: e.target.value })}
+                    />
+                    <TextField
+                        margin="dense"
+                        label="Fakülte"
+                        fullWidth
+                        value={formData.faculty}
+                        onChange={(e) => setFormData({ ...formData, faculty: e.target.value })}
+                    />
+                    <TextField
+                        margin="dense"
+                        label="Bölüm"
+                        fullWidth
+                        value={formData.department}
+                        onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                    />
+                    <TextField
+                        margin="dense"
+                        label="Sınıf"
+                        fullWidth
+                        value={formData.grade}
+                        onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                    />
+                    <FormControl fullWidth margin="dense">
+                        <InputLabel>Rol</InputLabel>
+                        <Select
+                            value={formData.role}
+                            label="Rol"
+                            onChange={(e) => setFormData({ ...formData, role: e.target.value as 'user' | 'admin', clubId: '' })}
+                        >
+                            <MenuItem value="user">Kullanıcı</MenuItem>
+                            <MenuItem value="admin">Yönetici</MenuItem>
+                        </Select>
+                    </FormControl>
+                    {formData.role === 'admin' && (
+                        <FormControl fullWidth margin="dense">
+                            <InputLabel>Kulüp</InputLabel>
+                            <Select
+                                value={formData.clubId}
+                                label="Kulüp"
+                                onChange={(e) => setFormData({ ...formData, clubId: e.target.value })}
+                            >
+                                {clubs.map(club => (
+                                    <MenuItem key={club.id} value={club.id}>{club.name}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    )}
+                    {formError && <Typography color="error" variant="body2">{formError}</Typography>}
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleClose}>İptal</Button>

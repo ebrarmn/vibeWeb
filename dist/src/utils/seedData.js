@@ -1,10 +1,10 @@
-import { clubServices, userServices, eventServices } from '../services/firestore';
-import { User, Club, Event } from '../types/models';
-
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const firestore_1 = require("../services/firestore");
 const seedData = async () => {
     try {
         // Kullanıcılar için test verileri
-        const users: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
+        const users = [
             {
                 firstName: 'Admin',
                 lastName: 'User',
@@ -17,7 +17,7 @@ const seedData = async () => {
                 department: '',
                 grade: '',
                 displayName: 'Admin User',
-                role: 'admin' as const,
+                role: 'admin',
                 clubIds: [],
                 clubRoles: {}
             },
@@ -33,7 +33,7 @@ const seedData = async () => {
                 department: '',
                 grade: '',
                 displayName: 'Ahmet Yılmaz',
-                role: 'user' as const,
+                role: 'user',
                 clubIds: [],
                 clubRoles: {}
             },
@@ -49,19 +49,15 @@ const seedData = async () => {
                 department: '',
                 grade: '',
                 displayName: 'Ayşe Demir',
-                role: 'user' as const,
+                role: 'user',
                 clubIds: [],
                 clubRoles: {}
             }
         ];
-
         // Kullanıcıları ekle
-        const userIds = await Promise.all(
-            users.map(user => userServices.create(user))
-        );
-
+        const userIds = await Promise.all(users.map(user => firestore_1.userServices.create(user)));
         // Kulüpler için test verileri
-        const clubs: Omit<Club, 'id' | 'createdAt' | 'updatedAt'>[] = [
+        const clubs = [
             {
                 name: 'Müzik Kulübü',
                 description: 'Üniversitemizin müzik tutkunlarını bir araya getiren kulüp.',
@@ -95,21 +91,17 @@ const seedData = async () => {
                 eventIds: []
             }
         ];
-
         // Kulüpleri ekle
-        const clubIds = await Promise.all(
-            clubs.map(club => clubServices.create(club))
-        );
-
+        const clubIds = await Promise.all(clubs.map(club => firestore_1.clubServices.create(club)));
         // Kullanıcıların clubIds ve clubRoles'lerini güncelle
-        await userServices.update(userIds[0], { 
+        await firestore_1.userServices.update(userIds[0], {
             clubIds: [clubIds[0], clubIds[2]],
             clubRoles: {
                 [clubIds[0]]: 'admin',
                 [clubIds[2]]: 'member'
             }
         });
-        await userServices.update(userIds[1], { 
+        await firestore_1.userServices.update(userIds[1], {
             clubIds: [clubIds[0], clubIds[1], clubIds[2]],
             clubRoles: {
                 [clubIds[0]]: 'member',
@@ -117,7 +109,7 @@ const seedData = async () => {
                 [clubIds[2]]: 'member'
             }
         });
-        await userServices.update(userIds[2], { 
+        await firestore_1.userServices.update(userIds[2], {
             clubIds: [clubIds[0], clubIds[1], clubIds[2]],
             clubRoles: {
                 [clubIds[0]]: 'member',
@@ -125,9 +117,8 @@ const seedData = async () => {
                 [clubIds[2]]: 'admin'
             }
         });
-
         // Etkinlikler için test verileri
-        const events: Omit<Event, 'id' | 'createdAt' | 'updatedAt'>[] = [
+        const events = [
             {
                 title: 'Yıl Sonu Konseri',
                 description: 'Müzik kulübü yıl sonu konseri',
@@ -171,25 +162,19 @@ const seedData = async () => {
                 }
             }
         ];
-
         // Etkinlikleri ekle
-        const eventIds = await Promise.all(
-            events.map(event => eventServices.create(event))
-        );
-
+        const eventIds = await Promise.all(events.map(event => firestore_1.eventServices.create(event)));
         // Kulüplerin eventIds'lerini güncelle
-        await clubServices.update(clubIds[0], { eventIds: [eventIds[0]] });
-        await clubServices.update(clubIds[1], { eventIds: [eventIds[1]] });
-        await clubServices.update(clubIds[2], { eventIds: [eventIds[2]] });
-
+        await firestore_1.clubServices.update(clubIds[0], { eventIds: [eventIds[0]] });
+        await firestore_1.clubServices.update(clubIds[1], { eventIds: [eventIds[1]] });
+        await firestore_1.clubServices.update(clubIds[2], { eventIds: [eventIds[2]] });
         console.log('Test verileri başarıyla yüklendi!');
         console.log('Kullanıcı ID\'leri:', userIds);
         console.log('Kulüp ID\'leri:', clubIds);
         console.log('Etkinlik ID\'leri:', eventIds);
-
-    } catch (error) {
+    }
+    catch (error) {
         console.error('Test verileri yüklenirken hata oluştu:', error);
     }
 };
-
-export default seedData; 
+exports.default = seedData;
