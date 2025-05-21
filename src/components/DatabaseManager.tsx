@@ -12,7 +12,7 @@ import {
     DialogContent,
     DialogActions
 } from '@mui/material';
-import { updateClubLeaderIds } from '../services/firebase';
+import { updateClubLeaderIds } from '../firebase/config';
 
 export default function DatabaseManager() {
     const [loading, setLoading] = useState(false);

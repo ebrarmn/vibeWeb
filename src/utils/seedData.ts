@@ -6,8 +6,7 @@ const seedData = async () => {
         // Kullanıcılar için test verileri
         const users: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
             {
-                firstName: 'Admin',
-                lastName: 'User',
+                displayName: 'Admin User',
                 email: 'admin@vibecom.com',
                 phone: '',
                 birthDate: '',
@@ -16,14 +15,13 @@ const seedData = async () => {
                 faculty: '',
                 department: '',
                 grade: '',
-                displayName: 'Admin User',
                 role: 'admin' as const,
                 clubIds: [],
-                clubRoles: {}
+                clubRoles: {},
+                studentNumber: '100000001',
             },
             {
-                firstName: 'Ahmet',
-                lastName: 'Yılmaz',
+                displayName: 'Ahmet Yılmaz',
                 email: 'user1@vibecom.com',
                 phone: '',
                 birthDate: '',
@@ -32,14 +30,13 @@ const seedData = async () => {
                 faculty: '',
                 department: '',
                 grade: '',
-                displayName: 'Ahmet Yılmaz',
                 role: 'user' as const,
                 clubIds: [],
-                clubRoles: {}
+                clubRoles: {},
+                studentNumber: '100000002',
             },
             {
-                firstName: 'Ayşe',
-                lastName: 'Demir',
+                displayName: 'Ayşe Demir',
                 email: 'user2@vibecom.com',
                 phone: '',
                 birthDate: '',
@@ -48,10 +45,10 @@ const seedData = async () => {
                 faculty: '',
                 department: '',
                 grade: '',
-                displayName: 'Ayşe Demir',
                 role: 'user' as const,
                 clubIds: [],
-                clubRoles: {}
+                clubRoles: {},
+                studentNumber: '100000003',
             }
         ];
 

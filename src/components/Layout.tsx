@@ -29,10 +29,10 @@ const drawerWidth = 240;
 
 const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-    { text: 'Kulüpler', icon: <BusinessIcon />, path: '/clubs' },
-    { text: 'Kullanıcılar', icon: <GroupIcon />, path: '/users' },
-    { text: 'Etkinlikler', icon: <EventIcon />, path: '/events' },
-    { text: 'Kulüp Başvuruları', icon: <BusinessIcon />, path: '/club-requests' },
+    { text: 'Kulüpler', icon: <BusinessIcon />, path: '/dashboard/clubs' },
+    { text: 'Kullanıcılar', icon: <GroupIcon />, path: '/dashboard/users' },
+    { text: 'Etkinlikler', icon: <EventIcon />, path: '/dashboard/events' },
+    { text: 'Kulüp Başvuruları', icon: <BusinessIcon />, path: '/dashboard/club-requests' },
 ];
 
 export default function Layout() {

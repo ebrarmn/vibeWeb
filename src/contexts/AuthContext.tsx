@@ -4,6 +4,7 @@ import { User } from '../types/models';
 interface AuthContextType {
     userData: User | null;
     loading: boolean;
+    logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -17,10 +18,9 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [userData] = useState<User | null>({
+    const [userData, setUserData] = useState<User | null>({
         id: 'admin',
-        firstName: 'Admin',
-        lastName: 'User',
+        displayName: 'Admin',
         email: 'admin@vibecom.com',
         phone: '',
         birthDate: '',
@@ -29,18 +29,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         faculty: '',
         department: '',
         grade: '',
-        displayName: 'Admin',
         role: 'admin',
         clubIds: [],
         clubRoles: {},
+        studentNumber: '100000000',
         createdAt: new Date(),
         updatedAt: new Date()
     });
     const [loading] = useState(false);
 
+    const logout = () => {
+        setUserData(null);
+    };
+
     const value = {
         userData,
-        loading
+        loading,
+        logout
     };
 
     return (

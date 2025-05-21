@@ -165,6 +165,7 @@ export const userServices = {
         const docRef = await addDoc(usersRef, {
             ...user,
             photoURL,
+            studentNumber: user.studentNumber,
             createdAt: now,
             updatedAt: now
         });
@@ -173,8 +174,19 @@ export const userServices = {
 
     async update(id: string, user: Partial<User>): Promise<void> {
         const docRef = doc(usersRef, id);
+
+        // undefined olan alanları sil, boş bırakılanlar "" olarak gitsin
+        const cleanUser: any = {};
+        Object.keys(user).forEach(key => {
+            const value = (user as any)[key];
+            if (value !== undefined) {
+                cleanUser[key] = value;
+            }
+        });
+
         await updateDoc(docRef, {
-            ...user,
+            ...cleanUser,
+            studentNumber: cleanUser.studentNumber || "",
             updatedAt: new Date()
         });
     },
@@ -220,6 +232,8 @@ export const eventServices = {
                 return {
                     id: doc.id,
                     ...data,
+                    attendeeIds: Array.isArray(data.attendeeIds) ? data.attendeeIds : [],
+                    attendeeStatus: typeof data.attendeeStatus === 'object' && data.attendeeStatus !== null ? data.attendeeStatus : {},
                     startDate: data.startDate instanceof Timestamp ? data.startDate.toDate().toISOString() : data.startDate,
                     endDate: data.endDate instanceof Timestamp ? data.endDate.toDate().toISOString() : data.endDate,
                     createdAt: data.createdAt?.toDate() || new Date(),

@@ -299,7 +299,7 @@ export default function Events() {
                             >
                                 <Chip
                                     icon={<GroupIcon />}
-                                    label={`${event.attendeeIds.length}/${event.capacity} Katılımcı`}
+                                    label={`${Array.isArray(event.attendeeIds) ? event.attendeeIds.length : 0}/${event.capacity} Katılımcı`}
                                     size="small"
                                     color="primary"
                                     variant="outlined"
@@ -307,9 +307,7 @@ export default function Events() {
                             </Box>
                             <Box sx={{ mt: 2 }}>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Katılımcılar:</Typography>
-                                {!Array.isArray(event.attendeeIds) || event.attendeeIds.length === 0 ? (
-                                    <Typography variant="body2" color="text.secondary">Katılımcı yok</Typography>
-                                ) : (
+                                {Array.isArray(event.attendeeIds) && event.attendeeIds.length > 0 ? (
                                     event.attendeeIds
                                         .filter(uid => !!uid && userMap[uid])
                                         .map(uid => (
@@ -327,6 +325,8 @@ export default function Events() {
                                                 </Typography>
                                             </Box>
                                         ))
+                                ) : (
+                                    <Typography variant="body2" color="text.secondary">Katılımcı yok</Typography>
                                 )}
                             </Box>
                             <Box sx={{ mt: 2, display: 'flex', gap: 1, justifyContent: 'flex-end' }}>

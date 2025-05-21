@@ -15,7 +15,7 @@ import {
     IconButton,
     Stack
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
     Email as EmailIcon,
     Lock as LockIcon,
@@ -25,6 +25,8 @@ import {
     AdminPanelSettings as AdminIcon,
     Person as UserIcon
 } from '@mui/icons-material';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase/config';
 
 interface TabPanelProps {
     children?: React.ReactNode;
@@ -76,8 +78,25 @@ export default function Login() {
         setError('');
 
         try {
-            // Firebase auth login işlemi burada yapılacak
-            navigate('/dashboard');
+            if (tabValue === 1) {
+                // Admin tabı seçiliyse
+                if (
+                    loginData.email === 'admin@gmail.com' &&
+                    loginData.password === 'admin'
+                ) {
+                    navigate('/dashboard');
+                } else {
+                    setError('Admin bilgileri hatalı!');
+                }
+            } else {
+                // Kullanıcı girişi (Firebase auth ile)
+                try {
+                    await signInWithEmailAndPassword(auth, loginData.email, loginData.password);
+                    navigate('/homepage');
+                } catch (firebaseError: any) {
+                    setError('E-posta veya şifre hatalı!');
+                }
+            }
         } catch (err) {
             setError('Giriş yapılırken bir hata oluştu.');
         } finally {
@@ -90,37 +109,79 @@ export default function Login() {
             sx={{
                 minHeight: '100vh',
                 display: 'flex',
-                alignItems: 'flex-start',
+                alignItems: 'center',
                 justifyContent: 'center',
-                background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.secondary.main, 0.1)} 100%)`,
-                pt: 4
+                background: `linear-gradient(135deg, 
+                    ${alpha('#ffffff', 0.95)} 0%, 
+                    ${alpha('#ffebee', 0.9)} 50%,
+                    ${alpha('#ffcdd2', 0.85)} 100%)`,
+                position: 'relative',
+                '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'url("/pattern.png")',
+                    opacity: 0.1,
+                    zIndex: 0
+                }
             }}
         >
-            <Container maxWidth="xs">
+            <Container maxWidth="xs" sx={{ position: 'relative', zIndex: 1 }}>
                 <Paper
-                    elevation={3}
+                    elevation={0}
                     sx={{
-                        borderRadius: 3,
-                        background: `linear-gradient(145deg, ${alpha(theme.palette.background.paper, 0.9)}, ${alpha(theme.palette.background.paper, 0.95)})`,
-                        backdropFilter: 'blur(10px)',
-                        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                        boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.37)}`
+                        borderRadius: 4,
+                        background: `linear-gradient(145deg, 
+                            ${alpha('#ffffff', 0.95)}, 
+                            ${alpha('#fff5f5', 0.98)})`,
+                        backdropFilter: 'blur(20px)',
+                        border: `1px solid ${alpha('#ffcdd2', 0.3)}`,
+                        boxShadow: `0 8px 32px 0 ${alpha('#ffcdd2', 0.2)}`,
+                        overflow: 'hidden',
+                        transition: 'transform 0.3s ease-in-out',
+                        '&:hover': {
+                            transform: 'translateY(-5px)'
+                        }
                     }}
                 >
-                    <Box sx={{ p: 2, textAlign: 'center' }}>
+                    <Box 
+                        sx={{ 
+                            p: 3, 
+                            textAlign: 'center',
+                            background: `linear-gradient(45deg, 
+                                ${alpha(theme.palette.primary.main, 0.1)}, 
+                                ${alpha(theme.palette.secondary.main, 0.1)})`,
+                            borderBottom: `1px solid ${alpha('#ffcdd2', 0.3)}`
+                        }}
+                    >
                         <Typography
-                            variant="h5"
+                            variant="h4"
                             sx={{
-                                fontWeight: 700,
-                                background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                                fontWeight: 800,
+                                background: `linear-gradient(45deg, 
+                                    ${theme.palette.primary.main}, 
+                                    ${theme.palette.secondary.main})`,
                                 backgroundClip: 'text',
                                 textFillColor: 'transparent',
                                 WebkitBackgroundClip: 'text',
                                 WebkitTextFillColor: 'transparent',
-                                mb: 1
+                                mb: 1,
+                                letterSpacing: '0.5px'
                             }}
                         >
                             VibeCOM
+                        </Typography>
+                        <Typography
+                            variant="subtitle1"
+                            sx={{
+                                color: theme.palette.text.secondary,
+                                fontWeight: 500
+                            }}
+                        >
+                            Hoş Geldiniz
                         </Typography>
                     </Box>
 
@@ -131,15 +192,18 @@ export default function Login() {
                         sx={{
                             '& .MuiTab-root': {
                                 minWidth: 0,
-                                px: 2,
-                                py: 1,
+                                px: 3,
+                                py: 2,
+                                fontSize: '0.9rem',
+                                fontWeight: 600,
                                 '&.Mui-selected': {
                                     color: theme.palette.primary.main
                                 }
                             },
                             '& .MuiTabs-indicator': {
                                 backgroundColor: theme.palette.primary.main,
-                                height: 2
+                                height: 3,
+                                borderRadius: '3px 3px 0 0'
                             }
                         }}
                     >
@@ -178,7 +242,7 @@ export default function Login() {
                             <Stack spacing={2}>
                                 <TextField
                                     fullWidth
-                                    size="small"
+                                    size="medium"
                                     label="E-posta"
                                     type="email"
                                     value={loginData.email}
@@ -187,22 +251,29 @@ export default function Login() {
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
-                                                <EmailIcon color="primary" fontSize="small" />
+                                                <EmailIcon color="primary" />
                                             </InputAdornment>
                                         )
                                     }}
                                     sx={{
                                         '& .MuiOutlinedInput-root': {
-                                            borderRadius: 1.5,
+                                            borderRadius: 2,
+                                            backgroundColor: alpha('#ffffff', 0.8),
                                             '&:hover fieldset': {
                                                 borderColor: theme.palette.primary.main
+                                            },
+                                            '&.Mui-focused fieldset': {
+                                                borderWidth: 2
                                             }
+                                        },
+                                        '& .MuiInputLabel-root': {
+                                            fontWeight: 500
                                         }
                                     }}
                                 />
                                 <TextField
                                     fullWidth
-                                    size="small"
+                                    size="medium"
                                     label="Şifre"
                                     type={showPassword ? 'text' : 'password'}
                                     value={loginData.password}
@@ -211,7 +282,7 @@ export default function Login() {
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
-                                                <LockIcon color="primary" fontSize="small" />
+                                                <LockIcon color="primary" />
                                             </InputAdornment>
                                         ),
                                         endAdornment: (
@@ -221,17 +292,24 @@ export default function Login() {
                                                     edge="end"
                                                     size="small"
                                                 >
-                                                    {showPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                                                    {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                                                 </IconButton>
                                             </InputAdornment>
                                         )
                                     }}
                                     sx={{
                                         '& .MuiOutlinedInput-root': {
-                                            borderRadius: 1.5,
+                                            borderRadius: 2,
+                                            backgroundColor: alpha('#ffffff', 0.8),
                                             '&:hover fieldset': {
                                                 borderColor: theme.palette.primary.main
+                                            },
+                                            '&.Mui-focused fieldset': {
+                                                borderWidth: 2
                                             }
+                                        },
+                                        '& .MuiInputLabel-root': {
+                                            fontWeight: 500
                                         }
                                     }}
                                 />
@@ -241,15 +319,21 @@ export default function Login() {
                                     variant="contained"
                                     disabled={loading}
                                     sx={{
-                                        mt: 1,
-                                        py: 1,
-                                        borderRadius: 1.5,
+                                        mt: 2,
+                                        py: 1.5,
+                                        borderRadius: 2,
                                         textTransform: 'none',
-                                        fontSize: '0.875rem',
+                                        fontSize: '1rem',
                                         fontWeight: 600,
-                                        background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                                        background: `linear-gradient(45deg, 
+                                            ${theme.palette.primary.main}, 
+                                            ${theme.palette.secondary.main})`,
+                                        boxShadow: `0 4px 14px 0 ${alpha(theme.palette.primary.main, 0.4)}`,
                                         '&:hover': {
-                                            background: `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.secondary.dark})`
+                                            background: `linear-gradient(45deg, 
+                                                ${theme.palette.primary.dark}, 
+                                                ${theme.palette.secondary.dark})`,
+                                            boxShadow: `0 6px 20px 0 ${alpha(theme.palette.primary.main, 0.6)}`
                                         }
                                     }}
                                 >
@@ -257,6 +341,21 @@ export default function Login() {
                                 </Button>
                             </Stack>
                         </form>
+                        <Typography align="center" sx={{ mt: 2 }}>
+                            Hesabın yok mu?{' '}
+                            <Link
+                                to="/register"
+                                style={{
+                                    color: '#d32f2f',
+                                    fontWeight: 600,
+                                    textDecoration: 'none',
+                                    marginLeft: 4,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Kayıt ol
+                            </Link>
+                        </Typography>
                     </TabPanel>
 
                     <TabPanel value={tabValue} index={1}>

@@ -11,8 +11,6 @@ export interface Club {
 
 export interface User {
     id: string;
-    firstName: string;
-    lastName: string;
     email: string;
     phone: string;
     birthDate: string;
@@ -26,6 +24,7 @@ export interface User {
     role: 'admin' | 'user';
     clubIds: string[];
     clubRoles: { [clubId: string]: 'admin' | 'member' };
+    studentNumber: string;
     createdAt: Date;
     updatedAt: Date;
 }

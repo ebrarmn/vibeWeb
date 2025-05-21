@@ -51,8 +51,7 @@ export default function Users() {
     const [manageUser, setManageUser] = useState<User | null>(null);
     const [clubs, setClubs] = useState<Club[]>([]);
     const [formData, setFormData] = useState<{
-        firstName: string;
-        lastName: string;
+        displayName: string;
         email: string;
         password: string;
         phone: string;
@@ -64,9 +63,9 @@ export default function Users() {
         grade: string;
         role: 'user' | 'admin';
         clubId: string;
+        studentNumber: string;
     }>({
-        firstName: '',
-        lastName: '',
+        displayName: '',
         email: '',
         password: '',
         phone: '',
@@ -77,7 +76,8 @@ export default function Users() {
         department: '',
         grade: '',
         role: 'user',
-        clubId: ''
+        clubId: '',
+        studentNumber: '',
     });
     const [formError, setFormError] = useState<string>('');
 
@@ -145,8 +145,7 @@ export default function Users() {
         setOpen(false);
         setSelectedUser(null);
         setFormData({
-            firstName: '',
-            lastName: '',
+            displayName: '',
             email: '',
             password: '',
             phone: '',
@@ -157,14 +156,24 @@ export default function Users() {
             department: '',
             grade: '',
             role: 'user',
-            clubId: ''
+            clubId: '',
+            studentNumber: '',
         });
+    };
+
+    const validateStudentNumber = (num: string): boolean => {
+        // Sadece rakam ve 9 hane kontrolü
+        return /^\d{9}$/.test(num);
     };
 
     const handleSubmit = async () => {
         setFormError('');
-        if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.phone || !formData.birthDate || !formData.gender || !formData.university || !formData.faculty || !formData.department || !formData.grade || !formData.role) {
+        if (!formData.displayName || !formData.email || !formData.password || !formData.phone || !formData.birthDate || !formData.gender || !formData.university || !formData.faculty || !formData.department || !formData.grade || !formData.role || !formData.studentNumber) {
             setFormError('Tüm alanları doldurmalısınız.');
+            return;
+        }
+        if (!validateStudentNumber(formData.studentNumber)) {
+            setFormError('Öğrenci numarası 9 haneli ve sadece rakamlardan oluşmalıdır.');
             return;
         }
         if (formData.role === 'admin' && !formData.clubId) {
@@ -175,15 +184,13 @@ export default function Users() {
             if (selectedUser) {
                 await userServices.update(selectedUser.id, {
                     ...formData,
-                    displayName: formData.firstName + ' ' + formData.lastName,
                     role: formData.role,
                 });
             } else {
                 let newUserId = '';
                 if (formData.role === 'admin') {
                     const userObj = {
-                        firstName: formData.firstName,
-                        lastName: formData.lastName,
+                        displayName: formData.displayName,
                         email: formData.email,
                         password: formData.password,
                         phone: formData.phone,
@@ -193,18 +200,17 @@ export default function Users() {
                         faculty: formData.faculty,
                         department: formData.department,
                         grade: formData.grade,
-                        displayName: formData.firstName + ' ' + formData.lastName,
                         role: 'admin' as const,
                         clubIds: [formData.clubId],
-                        clubRoles: { [formData.clubId]: 'admin' as const }
+                        clubRoles: { [formData.clubId]: 'admin' as const },
+                        studentNumber: formData.studentNumber,
                     };
                     const { password, ...userDataForFirestore } = userObj;
                     newUserId = await userServices.create(userDataForFirestore);
                     await clubServices.addMember(formData.clubId, newUserId, 'admin');
                 } else {
                     const userObj = {
-                        firstName: formData.firstName,
-                        lastName: formData.lastName,
+                        displayName: formData.displayName,
                         email: formData.email,
                         password: formData.password,
                         phone: formData.phone,
@@ -214,10 +220,10 @@ export default function Users() {
                         faculty: formData.faculty,
                         department: formData.department,
                         grade: formData.grade,
-                        displayName: formData.firstName + ' ' + formData.lastName,
                         role: 'user' as const,
                         clubIds: [],
-                        clubRoles: {}
+                        clubRoles: {},
+                        studentNumber: formData.studentNumber,
                     };
                     const { password, ...userDataForFirestore } = userObj;
                     await userServices.create(userDataForFirestore);
@@ -354,8 +360,7 @@ export default function Users() {
                                         e.stopPropagation();
                                         setSelectedUser(user);
                                         setFormData({
-                                            firstName: user.firstName,
-                                            lastName: user.lastName,
+                                            displayName: user.displayName,
                                             email: user.email,
                                             password: '',
                                             phone: user.phone,
@@ -366,7 +371,8 @@ export default function Users() {
                                             department: user.department,
                                             grade: user.grade,
                                             role: user.role,
-                                            clubId: user.clubIds.length > 0 ? user.clubIds[0] : ''
+                                            clubId: user.clubIds.length > 0 ? user.clubIds[0] : '',
+                                            studentNumber: user.studentNumber,
                                         });
                                         setOpen(true);
                                     }}
@@ -412,17 +418,10 @@ export default function Users() {
                 <DialogContent>
                     <TextField
                         margin="dense"
-                        label="Ad"
+                        label="Ad Soyad"
                         fullWidth
-                        value={formData.firstName}
-                        onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                    />
-                    <TextField
-                        margin="dense"
-                        label="Soyad"
-                        fullWidth
-                        value={formData.lastName}
-                        onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                        value={formData.displayName}
+                        onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
                     />
                     <TextField
                         margin="dense"
@@ -521,6 +520,14 @@ export default function Users() {
                             </Select>
                         </FormControl>
                     )}
+                    <TextField
+                        margin="dense"
+                        label="Öğrenci Numarası"
+                        fullWidth
+                        value={formData.studentNumber}
+                        onChange={(e) => setFormData({ ...formData, studentNumber: e.target.value })}
+                        inputProps={{ maxLength: 9 }}
+                    />
                     {formError && <Typography color="error" variant="body2">{formError}</Typography>}
                 </DialogContent>
                 <DialogActions>
