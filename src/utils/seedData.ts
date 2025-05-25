@@ -54,7 +54,10 @@ const seedData = async () => {
 
         // Kullanıcıları ekle
         const userIds = await Promise.all(
-            users.map(user => userServices.create(user))
+            users.map(user => {
+                const fakeUid = Math.random().toString(36).substring(2, 15);
+                return userServices.createWithId(fakeUid, user).then(() => fakeUid);
+            })
         );
 
         // Kulüpler için test verileri
@@ -62,6 +65,11 @@ const seedData = async () => {
             {
                 name: 'Müzik Kulübü',
                 description: 'Üniversitemizin müzik tutkunlarını bir araya getiren kulüp.',
+                type: 'Sanat',
+                tags: ['müzik', 'sanat', 'kültür'],
+                activities: ['konser', 'workshop', 'sosyal etkinlik'],
+                requiredSkills: ['müzik aleti çalma', 'şarkı söyleme'],
+                meetingTime: 'hafta içi akşam',
                 memberIds: [userIds[0], userIds[1], userIds[2]],
                 memberRoles: {
                     [userIds[0]]: 'admin',
@@ -73,6 +81,11 @@ const seedData = async () => {
             {
                 name: 'Dans Kulübü',
                 description: 'Modern dans, halk dansları ve latin dansları çalışmaları yapan kulüp.',
+                type: 'Spor',
+                tags: ['dans', 'spor', 'sanat'],
+                activities: ['workshop', 'turnuva', 'sosyal etkinlik'],
+                requiredSkills: ['dans', 'ritim duygusu'],
+                meetingTime: 'hafta sonu',
                 memberIds: [userIds[1], userIds[2]],
                 memberRoles: {
                     [userIds[1]]: 'admin',
@@ -83,6 +96,11 @@ const seedData = async () => {
             {
                 name: 'Tiyatro Kulübü',
                 description: 'Sahne sanatları ve tiyatro etkinlikleri düzenleyen kulüp.',
+                type: 'Sanat',
+                tags: ['tiyatro', 'sanat', 'kültür'],
+                activities: ['workshop', 'sahne gösterisi', 'sosyal etkinlik'],
+                requiredSkills: ['oyunculuk', 'sahne deneyimi'],
+                meetingTime: 'hafta içi öğleden sonra',
                 memberIds: [userIds[0], userIds[1], userIds[2]],
                 memberRoles: {
                     [userIds[2]]: 'admin',

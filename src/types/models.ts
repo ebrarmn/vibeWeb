@@ -2,6 +2,11 @@ export interface Club {
     id: string;
     name: string;
     description: string;
+    type?: string;
+    tags?: string[];
+    activities?: string[];
+    requiredSkills?: string[];
+    meetingTime?: string;
     createdAt: Date;
     updatedAt: Date;
     memberIds: string[];
@@ -27,6 +32,7 @@ export interface User {
     studentNumber: string;
     createdAt: Date;
     updatedAt: Date;
+    preferences?: UserPreferences;
 }
 
 export interface Event {
@@ -43,4 +49,23 @@ export interface Event {
     attendeeStatus: { [userId: string]: 'registered' | 'attended' | 'cancelled' };
     createdAt: Date;
     updatedAt: Date;
+}
+
+export interface ClubInvitation {
+    clubId: string;
+    clubName: string;
+    createdAt: Date;
+    receiverId: string;
+    senderId: string;
+    senderName: string;
+    status: 'pending' | 'approved' | 'rejected' | 'accepted';
+}
+
+export interface UserPreferences {
+    interests: string[];
+    hobbies: string[];
+    skills: string[];
+    preferredClubTypes: string[];
+    timeAvailability: string;
+    preferredActivities: string[];
 } 

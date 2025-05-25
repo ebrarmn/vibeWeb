@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, List, ListItem, ListItemIcon, ListItemText, Divider, Button, Dialog, DialogTitle, DialogContent, DialogActions, Typography, IconButton } from '@mui/material';
-import { Person, Group, Event, Home, Logout, Menu } from '@mui/icons-material';
+import { Person, Group, Event, Home, Logout, Menu, Business } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Logo from './Logo';
@@ -9,6 +9,7 @@ const menuItems = [
     { text: 'Anasayfa', icon: <Home />, path: '/homepage' },
     { text: 'Kulüpler', icon: <Group />, path: '/user-clubs' },
     { text: 'Etkinlikler', icon: <Event />, path: '/user-events' },
+    { text: 'Kulübüm', icon: <Business />, path: '/my-club' },
 ];
 const profileItem = { text: 'Profil', icon: <Person />, path: '/profile' };
 

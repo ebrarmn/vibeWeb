@@ -8,7 +8,7 @@ import Layout from './components/Layout';
 import Clubs from './pages/Clubs';
 import Users from './pages/Users';
 import Events from './pages/Events';
-import ClubRequests from './pages/ClubRequests';
+import ClubRequests from './pages/admin/ClubRequests';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider as CustomThemeProvider } from './context/ThemeContext';
 import Register from './pages/Register';
@@ -17,6 +17,7 @@ import Profile from './pages/Profile';
 import UserClubs from './pages/UserClubs';
 import UserEvents from './pages/UserEvents';
 import UserNavbar from './components/UserNavbar';
+import MyClub from './pages/MyClub';
 
 function UserLayout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -33,11 +34,11 @@ function UserLayout() {
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <AuthProvider>
-        <CustomThemeProvider>
-          <Router>
+    <Router>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <AuthProvider>
+          <CustomThemeProvider>
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
@@ -55,12 +56,13 @@ function App() {
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/user-clubs" element={<UserClubs />} />
                 <Route path="/user-events" element={<UserEvents />} />
+                <Route path="/my-club" element={<MyClub />} />
               </Route>
             </Routes>
-          </Router>
-        </CustomThemeProvider>
-      </AuthProvider>
-    </ThemeProvider>
+          </CustomThemeProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </Router>
   );
 }
 

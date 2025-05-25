@@ -3,6 +3,7 @@ import { Box, Typography, Paper, Grid, Chip } from '@mui/material';
 import { eventServices, clubServices } from '../services/firestore';
 import { Event, Club } from '../types/models';
 import { useOutletContext } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutContext {
     collapsed: boolean;
@@ -14,6 +15,9 @@ export default function UserEvents() {
     const [clubs, setClubs] = useState<Club[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const { drawerWidth } = useOutletContext<LayoutContext>();
+    const { userData, loading: authLoading } = useAuth();
+    const [buttonLoading, setButtonLoading] = useState<{ [eventId: string]: boolean }>({});
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     useEffect(() => {
         Promise.all([
@@ -25,6 +29,65 @@ export default function UserEvents() {
             setLoading(false);
         });
     }, []);
+
+    function canJoinEvent(event: Event): boolean {
+        if (!userData) return false;
+        // Etkinlik geçmiş mi?
+        const now = new Date();
+        const eventStart = new Date(event.startDate || (event as any).date);
+        if (eventStart < now) return false;
+        // Kullanıcı kulübe üye mi? (id'leri normalize et)
+        const userClubIds = userData.clubIds.map(id => id.trim().toLowerCase());
+        const eventClubId = (event.clubId || '').trim().toLowerCase();
+        if (!userClubIds.includes(eventClubId)) return false;
+        // attendeeIds'i güvenli şekilde al
+        const attendeeIds: string[] = Array.isArray(event.attendeeIds) ? event.attendeeIds : [];
+        // Etkinlik dolu mu?
+        if (attendeeIds.length >= event.capacity) return false;
+        // Kullanıcı zaten katıldı mı?
+        if (attendeeIds.includes(userData.id)) return false;
+        return true;
+    }
+
+    async function handleJoinEvent(event: Event) {
+        if (!userData) {
+            setErrorMessage('Etkinliğe katılmak için giriş yapmalısınız!');
+            return;
+        }
+        setButtonLoading(prev => ({ ...prev, [event.id]: true }));
+        setErrorMessage(null);
+        try {
+            await eventServices.registerAttendee(event.id, userData.id);
+            // Katılımcı listesini güncelle
+            setEvents(prevEvents => prevEvents.map(ev =>
+                ev.id === event.id
+                    ? { ...ev, attendeeIds: Array.isArray(ev.attendeeIds) ? [...ev.attendeeIds, userData.id] : [userData.id] }
+                    : ev
+            ));
+        } catch (err: any) {
+            setErrorMessage('Katılım sırasında hata oluştu: ' + (err?.message || 'Bilinmeyen hata'));
+        } finally {
+            setButtonLoading(prev => ({ ...prev, [event.id]: false }));
+        }
+    }
+
+    async function handleLeaveEvent(event: Event) {
+        if (!userData) return;
+        setButtonLoading(prev => ({ ...prev, [event.id]: true }));
+        setErrorMessage(null);
+        try {
+            await eventServices.removeAttendee(event.id, userData.id);
+            setEvents(prevEvents => prevEvents.map(ev =>
+                ev.id === event.id
+                    ? { ...ev, attendeeIds: Array.isArray(ev.attendeeIds) ? ev.attendeeIds.filter((id: string) => id !== userData.id) : [] }
+                    : ev
+            ));
+        } catch (err: any) {
+            setErrorMessage('Ayrılırken hata oluştu: ' + (err?.message || 'Bilinmeyen hata'));
+        } finally {
+            setButtonLoading(prev => ({ ...prev, [event.id]: false }));
+        }
+    }
 
     if (loading) {
         return <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">Yükleniyor...</Box>;
@@ -38,6 +101,16 @@ export default function UserEvents() {
                 <Grid container spacing={3}>
                     {events.map(event => {
                         const club = clubs.find(c => c.id === event.clubId);
+                        // Tarih gösterimini ve kontrolünü normalize et
+                        const eventStart = new Date(event.startDate || (event as any).date);
+                        const eventEnd = new Date(event.endDate || (event as any).date);
+                        // attendeeIds'i güvenli şekilde al
+                        const attendeeIds: string[] = Array.isArray(event.attendeeIds) ? event.attendeeIds : [];
+                        const isJoinable = canJoinEvent(event);
+                        const isJoined = userData && attendeeIds.includes(userData.id);
+                        const isPast = eventStart < new Date();
+                        const isFull = attendeeIds.length >= event.capacity;
+                        const notMember = userData && !userData.clubIds.map(id => id.trim().toLowerCase()).includes((event.clubId || '').trim().toLowerCase());
                         return (
                             <Grid item xs={12} sm={6} md={4} key={event.id}>
                                 <Paper elevation={0} sx={{
@@ -65,10 +138,10 @@ export default function UserEvents() {
                                     </Typography>
                                     <Box display="flex" flexDirection="column" gap={0.5} mb={1}>
                                         <Typography variant="caption" color="#64748b">
-                                            <b>Tarih:</b> {new Date(event.startDate).toLocaleDateString()} {event.startDate && (" - " + new Date(event.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}
+                                            <b>Tarih:</b> {isNaN(eventStart.getTime()) ? '-' : eventStart.toLocaleDateString()} {isNaN(eventStart.getTime()) ? '' : (" - " + eventStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}
                                         </Typography>
                                         <Typography variant="caption" color="#64748b">
-                                            <b>Bitiş:</b> {new Date(event.endDate).toLocaleDateString()} {event.endDate && (" - " + new Date(event.endDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}
+                                            <b>Bitiş:</b> {isNaN(eventEnd.getTime()) ? '-' : eventEnd.toLocaleDateString()} {isNaN(eventEnd.getTime()) ? '' : (" - " + eventEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}
                                         </Typography>
                                         <Typography variant="caption" color="#64748b">
                                             <b>Konum:</b> {event.location}
@@ -77,17 +150,67 @@ export default function UserEvents() {
                                             <b>Kapasite:</b> {event.capacity}
                                         </Typography>
                                         <Typography variant="caption" color="#64748b">
-                                            <b>Katılımcı Sayısı:</b> {event.attendeeIds?.length || 0}
+                                            <b>Katılımcı Sayısı:</b> {attendeeIds.length || 0}
                                         </Typography>
                                     </Box>
-                                    {event.attendeeIds?.length >= event.capacity && (
+                                    {isFull && (
                                         <Chip label="Dolu" color="error" size="small" />
                                     )}
+                                    <Box mt={2}>
+                                        {isJoined ? (
+                                            <button
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    background: '#ef4444',
+                                                    color: '#fff',
+                                                    border: 'none',
+                                                    borderRadius: '8px',
+                                                    cursor: buttonLoading[event.id] ? 'not-allowed' : 'pointer',
+                                                    fontWeight: 600,
+                                                    opacity: buttonLoading[event.id] ? 0.7 : 1
+                                                }}
+                                                onClick={() => handleLeaveEvent(event)}
+                                                disabled={buttonLoading[event.id]}
+                                            >
+                                                {buttonLoading[event.id] ? 'İşleniyor...' : 'Etkinlikten Ayrıl'}
+                                            </button>
+                                        ) : (
+                                            <button
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    background: isJoinable ? '#2563eb' : '#94a3b8',
+                                                    color: '#fff',
+                                                    border: 'none',
+                                                    borderRadius: '8px',
+                                                    cursor: buttonLoading[event.id] || !isJoinable ? 'not-allowed' : 'pointer',
+                                                    fontWeight: 600,
+                                                    opacity: buttonLoading[event.id] ? 0.7 : 1
+                                                }}
+                                                onClick={() => handleJoinEvent(event)}
+                                                disabled={buttonLoading[event.id] || !isJoinable}
+                                            >
+                                                {isPast
+                                                    ? 'Geçmiş Etkinlik'
+                                                    : notMember
+                                                        ? 'Kulübe Üye Olmalısınız'
+                                                        : isFull
+                                                            ? 'Dolu'
+                                                            : buttonLoading[event.id]
+                                                                ? 'İşleniyor...'
+                                                                : 'Etkinliğe Katıl'}
+                                            </button>
+                                        )}
+                                    </Box>
                                 </Paper>
                             </Grid>
                         );
                     })}
                 </Grid>
+            )}
+            {errorMessage && (
+                <Box mb={2}>
+                    <Typography color="error" fontWeight={600}>{errorMessage}</Typography>
+                </Box>
             )}
         </Box>
     );

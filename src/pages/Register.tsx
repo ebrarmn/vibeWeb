@@ -10,7 +10,8 @@ import {
     IconButton,
     Stack,
     ToggleButtonGroup,
-    ToggleButton
+    ToggleButton,
+    CircularProgress
 } from '@mui/material';
 import {
     Email as EmailIcon,
@@ -25,9 +26,12 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { alpha, useTheme } from '@mui/material/styles';
-import { userServices } from '../services/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { userServices, clubServices } from '../services/firestore';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase/config';
+import PreferenceQuiz, { QuizAnswer } from '../components/PreferenceQuiz';
+import { UserPreferences } from '../types/models';
+import { aiService } from '../services/aiService';
 
 export default function Register() {
     const theme = useTheme();
@@ -38,6 +42,14 @@ export default function Register() {
     const [grade, setGrade] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [showQuiz, setShowQuiz] = useState(false);
+    const [showQuizLoading, setShowQuizLoading] = useState(false);
+    const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
+    const [recommendation, setRecommendation] = useState<string | null>(null);
+    const [quizLoading, setQuizLoading] = useState(false);
+    const [quizError, setQuizError] = useState<string | null>(null);
+    const [recommendedClubId, setRecommendedClubId] = useState<string | null>(null);
+    const [createdUserId, setCreatedUserId] = useState<string | null>(null);
 
     const [form, setForm] = useState({
         displayName: '',
@@ -50,6 +62,8 @@ export default function Register() {
         department: '',
         grade: '',
         gender: '',
+        studentNumber: '',
+        birthDate: '',
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,7 +83,7 @@ export default function Register() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-        if (!form.displayName || !form.email || !form.password || !form.password2) {
+        if (!form.displayName || !form.email || !form.password || !form.password2 || !form.studentNumber || !form.birthDate) {
             setError('Lütfen tüm zorunlu alanları doldurun.');
             return;
         }
@@ -80,9 +94,11 @@ export default function Register() {
         setLoading(true);
         try {
             // 1. Authentication'a kayıt
-            await createUserWithEmailAndPassword(auth, form.email, form.password);
+            const userCredential = await createUserWithEmailAndPassword(auth, form.email, form.password);
+            const uid = userCredential.user.uid;
+            setCreatedUserId(uid);
             // 2. Firestore'a kayıt
-            await userServices.create({
+            const userData: any = {
                 displayName: form.displayName,
                 email: form.email,
                 phone: form.phone,
@@ -93,13 +109,22 @@ export default function Register() {
                 gender: form.gender,
                 role: 'user',
                 photoURL: '',
-                studentNumber: '',
-                birthDate: '',
+                studentNumber: form.studentNumber,
+                birthDate: form.birthDate,
                 clubIds: [],
-                clubRoles: {}
-            });
-            navigate('/login');
+                clubRoles: {},
+            };
+            if (userPreferences) {
+                userData.preferences = userPreferences;
+            }
+            await userServices.createWithId(uid, userData);
+            setShowQuizLoading(true); // Bekleme ekranını göster
+            setTimeout(() => {
+                setShowQuizLoading(false);
+                setShowQuiz(true); // 3 saniye sonra quiz ekranını göster
+            }, 4000);
         } catch (err: any) {
+            console.error('Gerçek hata:', err);
             if (err.code === 'auth/email-already-in-use') {
                 setError('Bu e-posta ile zaten bir hesap var.');
             } else if (err.code === 'auth/invalid-email') {
@@ -113,6 +138,138 @@ export default function Register() {
             setLoading(false);
         }
     };
+
+    const handleNotInterested = () => {
+        navigate('/homepage');
+    };
+
+    const handleQuizComplete = async (answers: QuizAnswer[]) => {
+        setQuizLoading(true);
+        setQuizError(null);
+        setRecommendation(null);
+        setRecommendedClubId(null);
+        try {
+            // 1. Kulüpleri çek
+            const clubs = await clubServices.getAll();
+            // 2. Prompt hazırla
+            const clubList = clubs.map(c => `{"id": "${c.id}", "name": "${c.name}", "desc": "${c.description}"}`).join(',\n');
+            const prompt = `
+Kullanıcı aşağıdaki sorulara şu cevapları verdi:
+${answers.map((a, i) => `${i + 1}. ${a.question} Cevap: ${a.answer}`).join('\n')}
+
+Aşağıda mevcut kulüplerin listesi var. Sadece bu listeden bir kulüp seçebilirsin. Listede olmayan bir kulüp ismi üretme. En uygun olanı seç ve nedenini açıkla. 
+Yanıtı, bir danışman gibi, doğrudan kullanıcıya hitap ederek, motive edici ve samimi bir dille yaz. Lafı çok uzun tutma, kısa ve öz olsun. Sanki bilgili bir kişi öneriyormuş gibi konuş. Yanıtı şu formatta ver:
+{"clubId": "...", "clubName": "...", "reason": "Bence senin için en uygun kulüp ... Çünkü ..."}
+Kulüp listesi:
+[${clubList}]
+`;
+            // 3. OpenAI API'ye gönder
+            const completion = await aiService.askGPT(prompt, 400);
+            // 4. Yanıtı ayrıştır
+            const match = completion.match(/\{[\s\S]*\}/);
+            let clubName = '';
+            let reason = '';
+            let clubId = '';
+            if (match) {
+                const obj = JSON.parse(match[0]);
+                clubName = obj.clubName;
+                reason = obj.reason;
+                clubId = obj.clubId;
+            }
+            setRecommendation(clubName ? `${clubName}: ${reason}` : 'Uygun kulüp bulunamadı.');
+            setRecommendedClubId(clubId || null);
+        } catch (err) {
+            setQuizError('Kulüp önerisi alınırken bir hata oluştu.');
+        } finally {
+            setQuizLoading(false);
+        }
+    };
+
+    const handleJoinClub = async () => {
+        if (!recommendedClubId || !createdUserId) return;
+        try {
+            // Kullanıcı login değilse login yap
+            if (!auth.currentUser) {
+                await signInWithEmailAndPassword(auth, form.email, form.password);
+            }
+            // Kulübe üye ekle (kulüp dokümanı)
+            await clubServices.addMember(recommendedClubId, createdUserId, 'member');
+            // Kullanıcı dokümanında clubIds ve clubRoles güncelle
+            await userServices.joinClub(createdUserId, recommendedClubId, 'member');
+            // Anasayfaya yönlendir
+            navigate('/homepage');
+        } catch (err) {
+            setQuizError('Kulübe katılırken bir hata oluştu.');
+            console.error('Kulübe katılırken hata:', err);
+        }
+    };
+
+    if (showQuizLoading) {
+        return (
+            <Box minHeight="100vh" display="flex" alignItems="center" justifyContent="center" sx={{ background: 'linear-gradient(135deg, #f8fafc 0%, #e0e7ef 100%)' }}>
+                <Paper sx={{ p: 5, borderRadius: 6, minWidth: 400, boxShadow: '0 8px 32px 0 rgba(80,120,200,0.10)', textAlign: 'center' }}>
+                    <CircularProgress size={48} sx={{ color: '#2563eb', mb: 3 }} />
+                    <Typography variant="h5" fontWeight={700} mb={2} color="#2563eb">
+                        Kayıt başarıyla oluşturuldu
+                    </Typography>
+                    <Typography variant="subtitle1" color="text.secondary">
+                        Sizi test ekranına yönlendiriyoruz...
+                    </Typography>
+                </Paper>
+            </Box>
+        );
+    }
+    if (showQuiz) {
+        return (
+            <Box minHeight="100vh" display="flex" alignItems="center" justifyContent="center" sx={{ background: 'linear-gradient(135deg, #f8fafc 0%, #e0e7ef 100%)' }}>
+                <Paper sx={{ p: 5, borderRadius: 6, minWidth: 400, boxShadow: '0 8px 32px 0 rgba(80,120,200,0.10)' }}>
+                    {!recommendation && !quizLoading && !quizError && (
+                        <PreferenceQuiz onComplete={handleQuizComplete} />
+                    )}
+                    {quizLoading && (
+                        <Box textAlign="center">
+                            <CircularProgress />
+                            <Typography mt={2}>Kulüp önerisi hazırlanıyor...</Typography>
+                        </Box>
+                    )}
+                    {recommendation && (
+                        <>
+                            <Typography variant="h4" fontWeight={700} mb={3} align="center" color="#2563eb">
+                                Sizin İçin Önerilen Kulüp
+                            </Typography>
+                            <Paper sx={{ p: 3, mb: 3, background: '#f1f5f9', borderRadius: 4 }} elevation={0}>
+                                <Typography align="center" sx={{ fontSize: 16, fontWeight: 500, mb: 2 }}>{recommendation}</Typography>
+                            </Paper>
+                            <Box display="flex" gap={2}>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    fullWidth
+                                    sx={{ fontWeight: 600, fontSize: 15, borderRadius: 2, py: 1, background: 'linear-gradient(90deg, #2563eb 0%, #60a5fa 100%)', minWidth: 0 }}
+                                    onClick={handleJoinClub}
+                                    disabled={!recommendedClubId || !createdUserId}
+                                >
+                                    Kulübe Katıl
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    color="secondary"
+                                    fullWidth
+                                    sx={{ fontWeight: 600, fontSize: 15, borderRadius: 2, py: 1, minWidth: 0, borderColor: '#64748b' }}
+                                    onClick={handleNotInterested}
+                                >
+                                    İlgilenmiyorum
+                                </Button>
+                            </Box>
+                        </>
+                    )}
+                    {quizError && (
+                        <Typography color="error" align="center">{quizError}</Typography>
+                    )}
+                </Paper>
+            </Box>
+        );
+    }
 
     return (
         <Box
@@ -360,6 +517,50 @@ export default function Register() {
                                 <ToggleButton value="5" sx={{ flex: 1 }}>5</ToggleButton>
                                 <ToggleButton value="6" sx={{ flex: 1 }}>6</ToggleButton>
                             </ToggleButtonGroup>
+                            <TextField
+                                name="studentNumber"
+                                label="Öğrenci Numarası"
+                                placeholder="Öğrenci numaranız"
+                                value={form.studentNumber}
+                                onChange={handleChange}
+                                fullWidth
+                                required
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <PersonIcon color="error" />
+                                        </InputAdornment>
+                                    )
+                                }}
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        borderRadius: 2,
+                                        backgroundColor: alpha('#fff', 0.7)
+                                    }
+                                }}
+                            />
+                            <TextField
+                                name="birthDate"
+                                label="Doğum Tarihi"
+                                placeholder="GG/AA/YYYY"
+                                value={form.birthDate}
+                                onChange={handleChange}
+                                fullWidth
+                                required
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <PersonIcon color="error" />
+                                        </InputAdornment>
+                                    )
+                                }}
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        borderRadius: 2,
+                                        backgroundColor: alpha('#fff', 0.7)
+                                    }
+                                }}
+                            />
                             {error && <Typography color="error" sx={{ fontWeight: 500 }}>{error}</Typography>}
                             <Button
                                 type="submit"

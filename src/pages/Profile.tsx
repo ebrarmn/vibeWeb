@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, Avatar, CircularProgress, Grid, Paper, Divider, Chip, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Snackbar, Alert, MenuItem, Select, InputLabel, FormControl, Tooltip, IconButton } from '@mui/material';
-import { userServices, clubServices, eventServices } from '../services/firestore';
-import { User, Club, Event } from '../types/models';
+import { userServices, clubServices, eventServices, clubInvitationServices } from '../services/firestore';
+import { User, Club, Event, ClubInvitation as ClubInvitationBase } from '../types/models';
 import { useOutletContext } from 'react-router-dom';
 import { auth, storage } from '../firebase/config';
 import { deleteField } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Edit } from '@mui/icons-material';
+import { Dialog as MuiDialog } from '@mui/material';
 
 const GENDER_OPTIONS = [
     { value: 'female', label: 'Kız' },
@@ -56,6 +57,8 @@ const FIELD_ORDER = [
 const LEFT_FIELDS = ['displayName', 'email', 'phone', 'gender', 'birthDate'];
 const RIGHT_FIELDS = ['studentNumber', 'university', 'faculty', 'department', 'grade'];
 
+type ClubInvitation = ClubInvitationBase & { id: string };
+
 export default function Profile() {
     const [user, setUser] = useState<User | null>(null);
     const [clubs, setClubs] = useState<Club[]>([]);
@@ -67,6 +70,14 @@ export default function Profile() {
     const [snackbar, setSnackbar] = useState<{open: boolean, message: string, severity: 'success'|'error'}>({open: false, message: '', severity: 'success'});
     const { drawerWidth } = useOutletContext<LayoutContext>();
     const [uploading, setUploading] = useState(false);
+    const [leaveDialog, setLeaveDialog] = useState<{open: boolean, club: Club | null}>({open: false, club: null});
+    const [leaving, setLeaving] = useState(false);
+    const [createClubDialog, setCreateClubDialog] = useState(false);
+    const [clubInvitation, setClubInvitation] = useState({ clubName: '' });
+    const [userClubInvitations, setUserClubInvitations] = useState<ClubInvitation[]>([]);
+    const [creatingClub, setCreatingClub] = useState(false);
+    const [pendingInvites, setPendingInvites] = useState<ClubInvitation[]>([]);
+    const [inviteLoading, setInviteLoading] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -89,6 +100,10 @@ export default function Profile() {
                         userClubs.some(club => club.id === event.clubId)
                     );
                     setEvents(clubEvents);
+
+                    // Kullanıcının kulüp isteklerini çek
+                    const invitations = await clubInvitationServices.getBySenderId(currentUser.id);
+                    setUserClubInvitations(invitations);
                 }
             } catch (error) {
                 console.error('Veri çekme hatası:', error);
@@ -99,6 +114,20 @@ export default function Profile() {
 
         fetchData();
     }, []);
+
+    // Kullanıcıya gelen pending davetleri çek
+    useEffect(() => {
+        const fetchPendingInvites = async () => {
+            if (!user) return;
+            try {
+                const allInvites = await clubInvitationServices.getAll();
+                setPendingInvites(allInvites.filter(i => i.receiverId === user.id && i.status === 'pending'));
+            } catch (err) {
+                // Hata yönetimi
+            }
+        };
+        fetchPendingInvites();
+    }, [user]);
 
     const handleEditOpen = () => {
         if (user) {
@@ -164,6 +193,121 @@ export default function Profile() {
         };
         input.click();
     };
+
+    // Kulüpten ayrılma işlemi
+    const handleLeaveClub = async (club: Club) => {
+        if (!user) return;
+        setLeaving(true);
+        try {
+            // 1. Kullanıcıyı kulüpten çıkar
+            await userServices.leaveClub(user.id, club.id);
+            // 2. Kulübün etkinliklerini bul
+            const clubEvents = await eventServices.getByClubId(club.id);
+            // 3. Kullanıcı o etkinliklere katıldıysa çıkar
+            for (const event of clubEvents) {
+                if (event.attendeeIds.includes(user.id)) {
+                    await eventServices.removeAttendee(event.id, user.id);
+                }
+            }
+            // 4. State ve arayüzü güncelle
+            setClubs(prev => prev.filter(c => c.id !== club.id));
+            setUser(prev => prev ? ({
+                ...prev,
+                clubIds: prev.clubIds.filter(cid => cid !== club.id),
+                clubRoles: Object.fromEntries(Object.entries(prev.clubRoles).filter(([k]) => k !== club.id))
+            }) : null);
+            // Tüm kulüp etkinliklerini kaldır
+            setEvents(prev => prev.filter(e => e.clubId !== club.id));
+            setSnackbar({open: true, message: 'Kulüpten ve ilgili etkinliklerden ayrıldınız.', severity: 'success'});
+        } catch (err) {
+            setSnackbar({open: true, message: 'Ayrılırken hata oluştu.', severity: 'error'});
+        } finally {
+            setLeaving(false);
+            setLeaveDialog({open: false, club: null});
+        }
+    };
+
+    // Kullanıcının katıldığı etkinlikleri ikiye ayır
+    const today = new Date();
+    const userEvents = events.filter(e => e.attendeeIds.includes(user?.id ?? ''));
+    const pastEvents = userEvents.filter(e => new Date(e.endDate) < today);
+    const futureEvents = userEvents.filter(e => new Date(e.endDate) >= today);
+
+    const handleCreateClubInvitation = async () => {
+        if (!user || !clubInvitation.clubName.trim()) return;
+        setCreatingClub(true);
+        try {
+            await clubInvitationServices.create({
+                clubId: '',
+                clubName: clubInvitation.clubName.trim(),
+                receiverId: '',
+                senderId: user.id,
+                senderName: user.displayName || '',
+            });
+            setSnackbar({open: true, message: 'Kulüp kurma isteğiniz başarıyla gönderildi.', severity: 'success'});
+            setCreateClubDialog(false);
+            setClubInvitation({ clubName: '' });
+            // İstekleri yeniden çek
+            const invitations = await clubInvitationServices.getBySenderId(user.id);
+            setUserClubInvitations(invitations);
+        } catch (err) {
+            setSnackbar({open: true, message: 'İstek gönderilirken hata oluştu.', severity: 'error'});
+        } finally {
+            setCreatingClub(false);
+        }
+    };
+
+    // Daveti onayla
+    const handleAcceptInvite = async (invite: ClubInvitation) => {
+        setInviteLoading(invite.id);
+        try {
+            await clubServices.addMember(invite.clubId, user!.id, 'member');
+            await userServices.joinClub(user!.id, invite.clubId, 'member');
+            await clubInvitationServices.update(invite.id, { status: 'accepted' });
+            setPendingInvites(pendingInvites.filter(i => i.id !== invite.id));
+            setSnackbar({ open: true, message: 'Davet kabul edildi, kulübe üye oldunuz.', severity: 'success' });
+        } catch (err) {
+            setSnackbar({ open: true, message: 'Davet kabul edilemedi.', severity: 'error' });
+        } finally {
+            setInviteLoading(null);
+        }
+    };
+
+    // Daveti reddet
+    const handleRejectInvite = async (invite: ClubInvitation) => {
+        setInviteLoading(invite.id);
+        try {
+            await clubInvitationServices.update(invite.id, { status: 'rejected' });
+            setPendingInvites(pendingInvites.filter(i => i.id !== invite.id));
+            setSnackbar({ open: true, message: 'Davet reddedildi.', severity: 'success' });
+        } catch (err) {
+            setSnackbar({ open: true, message: 'Davet reddedilemedi.', severity: 'error' });
+        } finally {
+            setInviteLoading(null);
+        }
+    };
+
+    // Davetler UI
+    function PendingInvitesList() {
+        if (pendingInvites.length === 0) return null;
+        return (
+            <Paper sx={{ p: 3, borderRadius: 4, mb: 4 }}>
+                <Typography variant="h6" fontWeight={700} color="#2563eb" mb={2}>Kulüp Davetleri</Typography>
+                {pendingInvites.map(invite => (
+                    <Box key={invite.id} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                        <Box>
+                            <Typography fontWeight={600}>{invite.clubName}</Typography>
+                            <Typography color="#64748b" fontSize={14}>Kulüp Daveti</Typography>
+                        </Box>
+                        <Box>
+                            <Button variant="contained" color="primary" size="small" sx={{ mr: 1 }} onClick={() => handleAcceptInvite(invite)} disabled={inviteLoading === invite.id}>{inviteLoading === invite.id ? 'İşleniyor...' : 'Onayla'}</Button>
+                            <Button variant="outlined" color="error" size="small" onClick={() => handleRejectInvite(invite)} disabled={inviteLoading === invite.id}>Reddet</Button>
+                        </Box>
+                    </Box>
+                ))}
+            </Paper>
+        );
+    }
 
     if (loading) {
         return <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh"><CircularProgress /></Box>;
@@ -357,6 +501,7 @@ export default function Profile() {
                                 boxShadow: '0 8px 32px 0 rgba(80,120,200,0.18)',
                                 bgcolor: 'rgba(222,242,255,0.85)',
                             },
+                            position: 'relative'
                         }}>
                             <Typography variant="h6" fontWeight={700} color="#2563eb" gutterBottom>
                                 {club.name}
@@ -369,17 +514,43 @@ export default function Profile() {
                                 color={user.clubRoles?.[club.id] === 'admin' ? 'primary' : 'default'}
                                 size="small"
                             />
+                            {/* Ayrıl butonu */}
+                            <Button
+                                variant="outlined"
+                                color="error"
+                                size="small"
+                                sx={{ position: 'absolute', top: 12, right: 12, minWidth: 0, px: 1.5, py: 0.5, fontSize: 13, borderRadius: 2, fontWeight: 600 }}
+                                onClick={() => setLeaveDialog({open: true, club})}
+                                disabled={leaving}
+                            >
+                                Ayrıl
+                            </Button>
                         </Paper>
                     </Grid>
                 ))}
             </Grid>
+            {/* Ayrıl onay dialogu */}
+            <MuiDialog open={leaveDialog.open} onClose={() => setLeaveDialog({open: false, club: null})}>
+                <DialogTitle>Kulüpten Ayrıl</DialogTitle>
+                <DialogContent>
+                    {leaveDialog.club && (
+                        <Typography>{leaveDialog.club.name} kulübünden ayrılmak istediğinize emin misiniz? Bu kulübün etkinliklerinden de otomatik olarak ayrılacaksınız.</Typography>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setLeaveDialog({open: false, club: null})} color="primary">İptal</Button>
+                    <Button onClick={() => leaveDialog.club && handleLeaveClub(leaveDialog.club)} color="error" variant="contained" disabled={leaving}>Evet, Ayrıl</Button>
+                </DialogActions>
+            </MuiDialog>
 
             <Divider sx={{ my: 4 }} />
 
             {/* Kulüp Etkinlikleri */}
-            <Typography variant="h5" fontWeight={700} color="#2563eb" mb={3}>Kulüp Etkinlikleri</Typography>
-            <Grid container spacing={3}>
-                {events.map((event) => (
+            <Typography variant="h5" fontWeight={700} color="#2563eb" mb={3}>Gelecekte Katılacağım Etkinlikler</Typography>
+            <Grid container spacing={3} mb={4}>
+                {futureEvents.length === 0 ? (
+                    <Grid item xs={12}><Typography color="#64748b">Yaklaşan etkinlik yok.</Typography></Grid>
+                ) : futureEvents.map((event) => (
                     <Grid item xs={12} sm={6} md={4} key={event.id}>
                         <Paper elevation={0} sx={{
                             p: 3,
@@ -413,6 +584,45 @@ export default function Profile() {
                     </Grid>
                 ))}
             </Grid>
+            <Typography variant="h5" fontWeight={700} color="#2563eb" mb={3}>Geçmiş Etkinlikler</Typography>
+            <Grid container spacing={3} mb={4}>
+                {pastEvents.length === 0 ? (
+                    <Grid item xs={12}><Typography color="#64748b">Geçmiş etkinlik yok.</Typography></Grid>
+                ) : pastEvents.map((event) => (
+                    <Grid item xs={12} sm={6} md={4} key={event.id}>
+                        <Paper elevation={0} sx={{
+                            p: 3,
+                            borderRadius: 4,
+                            bgcolor: 'rgba(255,255,255,0.75)',
+                            boxShadow: '0 4px 24px 0 rgba(80,120,200,0.10)',
+                            transition: 'box-shadow 0.2s, background 0.2s',
+                            '&:hover': {
+                                boxShadow: '0 8px 32px 0 rgba(80,120,200,0.18)',
+                                bgcolor: 'rgba(222,242,255,0.85)',
+                            },
+                        }}>
+                            <Typography variant="subtitle2" fontWeight={700} color="#e11d48" gutterBottom>
+                                {clubs.find(c => c.id === event.clubId)?.name}
+                            </Typography>
+                            <Typography variant="h6" fontWeight={800} color="#2563eb" gutterBottom>
+                                {event.title}
+                            </Typography>
+                            <Typography variant="body2" color="#334155" paragraph>
+                                {event.description}
+                            </Typography>
+                            <Box display="flex" justifyContent="space-between" alignItems="center">
+                                <Typography variant="caption" color="#64748b">
+                                    {new Date(event.startDate).toLocaleDateString()}
+                                </Typography>
+                                <Typography variant="caption" color="#64748b">
+                                    {event.location}
+                                </Typography>
+                            </Box>
+                        </Paper>
+                    </Grid>
+                ))}
+            </Grid>
+            <PendingInvitesList />
         </Box>
     );
 } 

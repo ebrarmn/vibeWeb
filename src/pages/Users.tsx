@@ -206,7 +206,9 @@ export default function Users() {
                         studentNumber: formData.studentNumber,
                     };
                     const { password, ...userDataForFirestore } = userObj;
-                    newUserId = await userServices.create(userDataForFirestore);
+                    const fakeUid = Math.random().toString(36).substring(2, 15);
+                    await userServices.createWithId(fakeUid, userDataForFirestore);
+                    newUserId = fakeUid;
                     await clubServices.addMember(formData.clubId, newUserId, 'admin');
                 } else {
                     const userObj = {
@@ -226,7 +228,9 @@ export default function Users() {
                         studentNumber: formData.studentNumber,
                     };
                     const { password, ...userDataForFirestore } = userObj;
-                    await userServices.create(userDataForFirestore);
+                    const fakeUid2 = Math.random().toString(36).substring(2, 15);
+                    await userServices.createWithId(fakeUid2, userDataForFirestore);
+                    newUserId = fakeUid2;
                 }
             }
             fetchUsers();

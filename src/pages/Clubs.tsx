@@ -55,7 +55,12 @@ export default function Clubs() {
     const [selectedClub, setSelectedClub] = useState<Club | null>(null);
     const [formData, setFormData] = useState({
         name: '',
-        description: ''
+        description: '',
+        type: '',
+        tags: [],
+        activities: [],
+        requiredSkills: [],
+        meetingTime: ''
     });
     const [searchTerm, setSearchTerm] = useState('');
     const [memberFilter, setMemberFilter] = useState('all');
@@ -134,7 +139,15 @@ export default function Clubs() {
     const handleClose = () => {
         setOpen(false);
         setSelectedClub(null);
-        setFormData({ name: '', description: '' });
+        setFormData({
+            name: '',
+            description: '',
+            type: '',
+            tags: [],
+            activities: [],
+            requiredSkills: [],
+            meetingTime: ''
+        });
     };
 
     const handleSubmit = async () => {
@@ -144,6 +157,11 @@ export default function Clubs() {
             } else {
                 await clubServices.create({
                     ...formData,
+                    type: formData.type || "Sosyal",
+                    tags: formData.tags || [],
+                    activities: formData.activities || [],
+                    requiredSkills: formData.requiredSkills || [],
+                    meetingTime: formData.meetingTime || "",
                     memberIds: [],
                     memberRoles: {},
                     eventIds: []
@@ -496,7 +514,12 @@ export default function Clubs() {
                                             setSelectedClub(club);
                                             setFormData({
                                                 name: club.name,
-                                                description: club.description
+                                                description: club.description,
+                                                type: club.type,
+                                                tags: club.tags,
+                                                activities: club.activities,
+                                                requiredSkills: club.requiredSkills,
+                                                meetingTime: club.meetingTime
                                             });
                                             setOpen(true);
                                         }}
@@ -554,6 +577,41 @@ export default function Clubs() {
                         rows={4}
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    />
+                    <TextField
+                        margin="dense"
+                        label="Tür"
+                        fullWidth
+                        value={formData.type}
+                        onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    />
+                    <TextField
+                        margin="dense"
+                        label="Etiketler"
+                        fullWidth
+                        value={formData.tags.join(', ')}
+                        onChange={(e) => setFormData({ ...formData, tags: e.target.value.split(',').map(t => t.trim()) })}
+                    />
+                    <TextField
+                        margin="dense"
+                        label="Etkinlikler"
+                        fullWidth
+                        value={formData.activities.join(', ')}
+                        onChange={(e) => setFormData({ ...formData, activities: e.target.value.split(',').map(a => a.trim()) })}
+                    />
+                    <TextField
+                        margin="dense"
+                        label="Gerekli Beceriler"
+                        fullWidth
+                        value={formData.requiredSkills.join(', ')}
+                        onChange={(e) => setFormData({ ...formData, requiredSkills: e.target.value.split(',').map(s => s.trim()) })}
+                    />
+                    <TextField
+                        margin="dense"
+                        label="Toplantı Zamanı"
+                        fullWidth
+                        value={formData.meetingTime}
+                        onChange={(e) => setFormData({ ...formData, meetingTime: e.target.value })}
                     />
                 </DialogContent>
                 <DialogActions>

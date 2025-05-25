@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Grid, Paper } from '@mui/material';
+import { Box, Typography, Grid, Paper, Button } from '@mui/material';
 import { clubServices, eventServices } from '../services/firestore';
 import { Club, Event } from '../types/models';
 import { useOutletContext } from 'react-router-dom';
+import MagicClubDialog from '../components/MagicClubDialog';
 
 interface LayoutContext {
     collapsed: boolean;
@@ -14,6 +15,7 @@ export default function Homepage() {
     const [events, setEvents] = useState<Event[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const { drawerWidth } = useOutletContext<LayoutContext>();
+    const [magicOpen, setMagicOpen] = useState<boolean>(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -38,7 +40,37 @@ export default function Homepage() {
     clubs.forEach((club) => { clubMap[club.id] = club.name; });
 
     return (
-        <Box sx={{ bgcolor: '#f8fafc', minHeight: '100vh', width: '100%', py: 6, px: { xs: 2, md: 8 }, marginLeft: `${drawerWidth}px`, paddingLeft: { xs: 2, md: 5 }, transition: 'margin-left 0.2s, padding-left 0.2s' }}>
+        <Box sx={{ bgcolor: '#f8fafc', minHeight: '100vh', width: '100%', py: 6, px: { xs: 2, md: 8 }, marginLeft: `${drawerWidth}px`, paddingLeft: { xs: 2, md: 5 }, transition: 'margin-left 0.2s, padding-left 0.2s', position: 'relative' }}>
+            {/* Sağ üstte sihirli buton */}
+            <Box sx={{ position: 'absolute', top: 24, right: 32, zIndex: 10 }}>
+                <Button
+                    variant="contained"
+                    color="secondary"
+                    sx={{
+                        fontWeight: 600,
+                        fontSize: 10,
+                        letterSpacing: 1.5,
+                        borderRadius: 50,
+                        px: 3,
+                        py: 2.2,
+                        boxShadow: '0 6px 24px 0 rgba(220,38,85,0.18)',
+                        background: 'linear-gradient(90deg,rgb(59, 54, 218) 60%,rgb(0, 101, 196) 100%)',
+                        color: '#fff',
+                        textTransform: 'uppercase',
+                        transition: 'all 0.18s cubic-bezier(.4,0,.2,1)',
+                        '&:hover': {
+                            background: 'linear-gradient(90deg,rgba(17, 6, 168, 0.95) 60%,rgb(255, 105, 105) 100%)',
+                            color: '#fff',
+                            boxShadow: '0 10px 32px 0 rgba(220,38,85,0.28)',
+                            transform: 'translateY(-2px) scale(1.04)'
+                        }
+                    }}
+                    onClick={() => setMagicOpen(true)}
+                >
+                    KENDİNİZE GÖRE YENİ KULÜP MÜ ARIYORSUNUZ? 
+                </Button>
+            </Box>
+            <MagicClubDialog open={magicOpen} onClose={() => setMagicOpen(false)} clubs={clubs} />
             <Box mb={4}>
                 <Typography variant="h3" fontWeight={900} color="#2563eb" letterSpacing={1.5} mb={1}>
                     VIBE

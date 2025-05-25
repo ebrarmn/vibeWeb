@@ -11,7 +11,12 @@ import {
     ListItemIcon,
     ListItemText,
     Toolbar,
-    Typography
+    Typography,
+    Button,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions
 } from '@mui/material';
 import {
     Menu as MenuIcon,
@@ -20,10 +25,12 @@ import {
     Event as EventIcon,
     Business as BusinessIcon,
     Brightness4,
-    Brightness7
+    Brightness7,
+    Logout as LogoutIcon
 } from '@mui/icons-material';
 import { useTheme } from '../context/ThemeContext';
 import Logo from './Logo';
+import { useAuth } from '../contexts/AuthContext';
 
 const drawerWidth = 240;
 
@@ -40,13 +47,20 @@ export default function Layout() {
     const navigate = useNavigate();
     const location = useLocation();
     const { mode, toggleTheme } = useTheme();
+    const { logout } = useAuth();
+    const [open, setOpen] = useState(false);
 
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);
     };
 
+    const handleLogout = async () => {
+        await logout();
+        navigate('/login');
+    };
+
     const drawer = (
-        <div>
+        <div style={{height: '100%', display: 'flex', flexDirection: 'column'}}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', px: 2, py: 2, bgcolor: 'background.paper', cursor: 'pointer' }}
                 onClick={() => navigate('/dashboard')}
             >
@@ -83,6 +97,42 @@ export default function Layout() {
                     </ListItem>
                 ))}
             </List>
+            <Box sx={{ flexGrow: 1 }} />
+            <Box sx={{ p: 2 }}>
+                <Button
+                    startIcon={<LogoutIcon sx={{ color: '#64748b', transition: 'color 0.2s' }} />}
+                    fullWidth
+                    sx={{
+                        color: '#64748b',
+                        justifyContent: 'flex-start',
+                        borderRadius: 2,
+                        bgcolor: 'transparent',
+                        fontWeight: 600,
+                        fontSize: 16,
+                        px: 2,
+                        py: 1.2,
+                        textTransform: 'none',
+                        boxShadow: 'none',
+                        transition: 'background 0.2s, color 0.2s',
+                        '&:hover': {
+                            bgcolor: 'rgba(220,38,38,0.08)',
+                            color: '#dc2626',
+                            '& .MuiSvgIcon-root': { color: '#dc2626' }
+                        }
+                    }}
+                    onClick={() => setOpen(true)}
+                >
+                    Çıkış
+                </Button>
+                <Dialog open={open} onClose={() => setOpen(false)}>
+                    <DialogTitle>Çıkış Yap</DialogTitle>
+                    <DialogContent>Çıkış yapmak istediğinizden emin misiniz?</DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setOpen(false)} color="primary">Hayır</Button>
+                        <Button onClick={handleLogout} color="error" variant="contained">Evet</Button>
+                    </DialogActions>
+                </Dialog>
+            </Box>
         </div>
     );
 

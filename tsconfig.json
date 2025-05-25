@@ -8,5 +8,5 @@
     "lib": ["esnext", "dom"],
     "jsx": "react-jsx"
   },
-  "include": ["scripts", "src"]
+  "include": ["scripts", "src", "migrateEvents.js"]
 }

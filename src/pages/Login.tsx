@@ -27,6 +27,8 @@ import {
 } from '@mui/icons-material';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase/config';
+import { useAuth } from '../contexts/AuthContext';
+import { userServices } from '../services/firestore';
 
 interface TabPanelProps {
     children?: React.ReactNode;
@@ -67,6 +69,8 @@ export default function Login() {
         password: ''
     });
 
+    const { setUserData } = useAuth();
+
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
         setError('');
@@ -91,7 +95,33 @@ export default function Login() {
             } else {
                 // Kullanıcı girişi (Firebase auth ile)
                 try {
-                    await signInWithEmailAndPassword(auth, loginData.email, loginData.password);
+                    const userCredential = await signInWithEmailAndPassword(auth, loginData.email, loginData.password);
+                    const user = userCredential.user;
+                    // Firestore'dan kullanıcıyı çek ve AuthContext'e set et
+                    let userDoc = await userServices.getById(user.uid);
+                    if (!userDoc) {
+                        // Kullanıcı Firestore'da yoksa, oluştur
+                        userDoc = {
+                            id: user.uid,
+                            displayName: user.displayName || loginData.email.split('@')[0],
+                            email: user.email || loginData.email,
+                            phone: user.phoneNumber || '',
+                            birthDate: '',
+                            gender: '',
+                            university: '',
+                            faculty: '',
+                            department: '',
+                            grade: '',
+                            role: 'user',
+                            clubIds: [],
+                            clubRoles: {},
+                            studentNumber: '',
+                            createdAt: new Date(),
+                            updatedAt: new Date()
+                        };
+                        await userServices.createWithId(user.uid, userDoc);
+                    }
+                    setUserData(userDoc);
                     navigate('/homepage');
                 } catch (firebaseError: any) {
                     setError('E-posta veya şifre hatalı!');

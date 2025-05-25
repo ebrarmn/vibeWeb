@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, Paper, Grid, Chip } from '@mui/material';
-import { clubServices, eventServices } from '../services/firestore';
+import { clubServices, eventServices, userServices } from '../services/firestore';
 import { Club, Event } from '../types/models';
 import { useOutletContext } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutContext {
     collapsed: boolean;
@@ -14,6 +15,12 @@ export default function UserClubs() {
     const [events, setEvents] = useState<Event[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const { drawerWidth } = useOutletContext<LayoutContext>();
+    const [joinedClubs, setJoinedClubs] = useState<{ [clubId: string]: boolean }>({});
+    const { userData, loading: authLoading } = useAuth();
+    const [buttonLoading, setButtonLoading] = useState<{ [clubId: string]: boolean }>({});
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    console.log('userData:', userData);
 
     useEffect(() => {
         Promise.all([
@@ -26,12 +33,65 @@ export default function UserClubs() {
         });
     }, []);
 
-    if (loading) {
+    useEffect(() => {
+        if (!userData || clubs.length === 0) return;
+        const userClubIds = clubs.filter(club => club.memberIds?.includes(userData.id)).map(club => club.id);
+        setJoinedClubs(
+            clubs.reduce((acc, club) => {
+                acc[club.id] = userClubIds.includes(club.id);
+                return acc;
+            }, {} as { [clubId: string]: boolean })
+        );
+    }, [userData, clubs]);
+
+    async function handleJoinLeaveClub(clubId: string) {
+        if (!userData) return;
+        setButtonLoading(prev => ({ ...prev, [clubId]: true }));
+        setErrorMessage(null);
+        try {
+            if (joinedClubs[clubId]) {
+                await Promise.all([
+                    clubServices.removeMember(clubId, userData.id),
+                    userServices.leaveClub(userData.id, clubId)
+                ]);
+            } else {
+                await Promise.all([
+                    clubServices.addMember(clubId, userData.id, 'member'),
+                    userServices.joinClub(userData.id, clubId, 'member')
+                ]);
+            }
+            setJoinedClubs(prev => ({
+                ...prev,
+                [clubId]: !prev[clubId]
+            }));
+        } catch (err: any) {
+            setErrorMessage('Bir hata oluştu: ' + (err?.message || 'Bilinmeyen hata'));
+            console.error('Kulüp katıl/ayrıl hatası:', err);
+        } finally {
+            setButtonLoading(prev => ({ ...prev, [clubId]: false }));
+        }
+    }
+
+    // Kullanıcı giriş yapmamışsa butonlar tıklanınca uyarı versin
+    function handleButtonClick(clubId: string) {
+        if (!userData) {
+            alert('Kulübe katılmak için giriş yapmalısınız!');
+            return;
+        }
+        handleJoinLeaveClub(clubId);
+    }
+
+    if (authLoading) {
         return <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">Yükleniyor...</Box>;
     }
     return (
         <Box sx={{ bgcolor: '#f8fafc', minHeight: '100vh', width: '100%', py: 6, px: { xs: 2, md: 8 }, marginLeft: `${drawerWidth}px`, paddingLeft: { xs: 2, md: 5 }, transition: 'margin-left 0.2s, padding-left 0.2s' }}>
             <Typography variant="h4" fontWeight={700} color="#2563eb" mb={4}>Tüm Kulüpler</Typography>
+            {errorMessage && (
+                <Box mb={2}>
+                    <Typography color="error" fontWeight={600}>{errorMessage}</Typography>
+                </Box>
+            )}
             {clubs.length === 0 ? (
                 <Typography color="#334155">Hiç kulüp bulunamadı.</Typography>
             ) : (
@@ -39,6 +99,7 @@ export default function UserClubs() {
                     {clubs.map(club => {
                         const clubEventCount = events.filter(e => e.clubId === club.id).length;
                         const adminCount = club.memberRoles ? Object.values(club.memberRoles).filter(role => role === 'admin').length : 0;
+                        const isJoined: boolean = joinedClubs[club.id] || false;
                         return (
                             <Grid item xs={12} sm={6} md={4} key={club.id}>
                                 <Paper elevation={0} sx={{
@@ -78,6 +139,28 @@ export default function UserClubs() {
                                     {adminCount === 0 && (
                                         <Chip label="Yönetici Yok" color="warning" size="small" />
                                     )}
+                                    <Box mt={2}>
+                                        <button
+                                            style={{
+                                                padding: '8px 16px',
+                                                background: isJoined ? '#ef4444' : '#2563eb',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                cursor: buttonLoading[club.id] ? 'not-allowed' : 'pointer',
+                                                fontWeight: 600,
+                                                opacity: buttonLoading[club.id] ? 0.7 : 1
+                                            }}
+                                            onClick={() => handleButtonClick(club.id)}
+                                            disabled={!!buttonLoading[club.id]}
+                                        >
+                                            {buttonLoading[club.id]
+                                                ? 'İşleniyor...'
+                                                : isJoined
+                                                    ? 'Kulüpten Ayrıl'
+                                                    : 'Kulübe Katıl'}
+                                        </button>
+                                    </Box>
                                 </Paper>
                             </Grid>
                         );

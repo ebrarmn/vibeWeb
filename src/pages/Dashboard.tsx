@@ -248,17 +248,6 @@ export default function Dashboard() {
                     >
                         Yönetici Paneli
                     </Typography>
-                    <IconButton
-                        onClick={handleLogout}
-                        sx={{
-                            color: theme.palette.error.main,
-                            '&:hover': {
-                                backgroundColor: alpha(theme.palette.error.main, 0.1)
-                            }
-                        }}
-                    >
-                        <LogoutIcon />
-                    </IconButton>
                 </Box>
                 <Typography variant="body1" color="textSecondary">
                     Platformunuzun genel durumunu buradan takip edebilirsiniz.

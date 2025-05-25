@@ -8,10 +8,11 @@ import {
     deleteDoc,
     query,
     where,
-    Timestamp
+    Timestamp,
+    setDoc
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { Club, User, Event } from '../types/models';
+import { Club, User, Event, ClubInvitation } from '../types/models';
 
 // Koleksiyon referansları
 const clubsRef = collection(db, 'clubs');
@@ -159,17 +160,15 @@ export const userServices = {
         }
     },
 
-    async create(user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+    async createWithId(uid: string, user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> {
         const now = new Date();
         const photoURL = user.photoURL || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.displayName || 'User');
-        const docRef = await addDoc(usersRef, {
+        await setDoc(doc(usersRef, uid), {
             ...user,
             photoURL,
-            studentNumber: user.studentNumber,
             createdAt: now,
             updatedAt: now
         });
-        return docRef.id;
     },
 
     async update(id: string, user: Partial<User>): Promise<void> {
@@ -256,6 +255,7 @@ export const eventServices = {
             return {
                 id: docSnap.id,
                 ...data,
+                attendeeIds: Array.isArray(data.attendeeIds) ? data.attendeeIds : [],
                 startDate: data.startDate instanceof Timestamp ? data.startDate.toDate().toISOString() : data.startDate,
                 endDate: data.endDate instanceof Timestamp ? data.endDate.toDate().toISOString() : data.endDate,
                 createdAt: data.createdAt?.toDate() || new Date(),
@@ -354,6 +354,13 @@ export const pendingClubServices = {
         const snapshot = await getDocs(pendingClubsRef);
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     },
+    async create(data: any): Promise<string> {
+        const docRef = await addDoc(pendingClubsRef, {
+            ...data,
+            createdAt: new Date()
+        });
+        return docRef.id;
+    },
     async approve(pendingClub: any): Promise<void> {
         // Yeni kulüp oluştur
         const clubData = {
@@ -384,5 +391,44 @@ export const pendingClubServices = {
     },
     async reject(pendingClubId: string): Promise<void> {
         await deleteDoc(doc(pendingClubsRef, pendingClubId));
+    }
+};
+
+// Kulüp Davet/İstek Servisleri
+export const clubInvitationServices = {
+    async create(data: Omit<ClubInvitation, 'createdAt' | 'status'>): Promise<string> {
+        const docRef = await addDoc(collection(db, 'clubInvitations'), {
+            ...data,
+            createdAt: new Date(),
+            status: 'pending'
+        });
+        return docRef.id;
+    },
+
+    async getAll(): Promise<(ClubInvitation & { id: string })[]> {
+        const snapshot = await getDocs(collection(db, 'clubInvitations'));
+        return snapshot.docs.map(doc => ({
+            ...(doc.data() as ClubInvitation),
+            id: doc.id,
+            createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : new Date()
+        }));
+    },
+
+    async getBySenderId(senderId: string): Promise<(ClubInvitation & { id: string })[]> {
+        const q = query(
+            collection(db, 'clubInvitations'),
+            where('senderId', '==', senderId)
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({
+            ...(doc.data() as ClubInvitation),
+            id: doc.id,
+            createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : new Date()
+        }));
+    },
+
+    async update(id: string, data: Partial<ClubInvitation>): Promise<void> {
+        const docRef = doc(db, 'clubInvitations', id);
+        await updateDoc(docRef, data);
     }
 }; 

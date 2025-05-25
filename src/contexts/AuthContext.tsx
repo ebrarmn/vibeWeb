@@ -1,10 +1,14 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types/models';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../firebase/config';
+import { userServices } from '../services/firestore';
 
 interface AuthContextType {
     userData: User | null;
     loading: boolean;
     logout: () => void;
+    setUserData: (user: User | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,25 +22,21 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [userData, setUserData] = useState<User | null>({
-        id: 'admin',
-        displayName: 'Admin',
-        email: 'admin@vibecom.com',
-        phone: '',
-        birthDate: '',
-        gender: '',
-        university: '',
-        faculty: '',
-        department: '',
-        grade: '',
-        role: 'admin',
-        clubIds: [],
-        clubRoles: {},
-        studentNumber: '100000000',
-        createdAt: new Date(),
-        updatedAt: new Date()
-    });
-    const [loading] = useState(false);
+    const [userData, setUserData] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                const userDoc = await userServices.getById(user.uid);
+                setUserData(userDoc);
+            } else {
+                setUserData(null);
+            }
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, []);
 
     const logout = () => {
         setUserData(null);
@@ -45,7 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const value = {
         userData,
         loading,
-        logout
+        logout,
+        setUserData
     };
 
     return (
