@@ -5,13 +5,13 @@ import { getAuth } from 'firebase/auth';
 import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAG-cdxcK5as0pX4gKpKqmCalFpEK-ea2w",
-  authDomain: "vibewebmobile.firebaseapp.com",
-  projectId: "vibewebmobile",
-  storageBucket: "vibewebmobile.firebasestorage.app",
-  messagingSenderId: "13381465438",
-  appId: "1:13381465438:web:401d4036c2037fcd1d8bcf",
-  measurementId: "G-8K3YRZSRMS"
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID,
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID
 };
 
 // Firebase'i başlat
